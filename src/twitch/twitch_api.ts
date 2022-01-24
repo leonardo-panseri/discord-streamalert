@@ -113,10 +113,9 @@ export class TwitchAPI {
             });
             if (res.ok) {
                 const json = await res.json();
-                const data = json['data'];
+                const data = json['data'][0];
                 data.forEach(sub => {
-                    console.log(sub['id'] + '==' + subscriptionID + ': ' + sub['id'] == subscriptionID);
-                    if (sub['id'] == subscriptionID) {
+                    if (sub['id'] === subscriptionID) {
                         return sub['status'];
                     }
                 });
@@ -156,8 +155,6 @@ export class TwitchAPI {
                     logger.info(`Cached sub is valid for '${broadcasterID}'`);
                     return;
                 } else {
-                    console.log('newstatus ' + newStatus);
-
                     logger.warn(`Cached sub is invalid (${newStatus}) for '${broadcasterID}'`);
                     if (newStatus !== 'not_exists') await this.deleteSubscription(appToken, subID);
                     delete cachedSubs[type];
