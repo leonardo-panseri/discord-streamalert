@@ -181,7 +181,7 @@ export class TwitchAPI {
 
             logger.info(`Subscribed to '${type}' for '${broadcasterID}'`);
         } else {
-            const errorMsg = res.text();
+            const errorMsg = await res.text();
             throw `Request to subscribe to '${type}' for '${broadcasterID}' failed with code ${res.status}\n${errorMsg}`;
         }
     }
