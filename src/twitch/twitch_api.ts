@@ -100,6 +100,8 @@ export class TwitchAPI {
     }
 
     private async getSubscriptionStatus(appToken: string, type: string, subscriptionID: string): Promise<string> {
+        let status = 'not_exists';
+
         const headers: HeadersInit = {
             'Authorization': `Bearer ${appToken}`,
             'Client-Id': this._clientID };
@@ -114,15 +116,12 @@ export class TwitchAPI {
             if (res.ok) {
                 const json = await res.json();
                 const data = json['data'];
-                data.forEach(sub => {
-                    console.log(sub);
-                    console.log(sub['id']);
-                    console.log(subscriptionID);
-
+                for (const sub of data) {
                     if (sub['id'] === subscriptionID) {
-                        return sub['status'];
+                        status = sub['status'];
+                        break;
                     }
-                });
+                }
 
                 paginationCursor = json['pagination']['cursor'];
                 if (paginationCursor === '') paginationCursor = undefined;
@@ -132,7 +131,7 @@ export class TwitchAPI {
             }
         } while (paginationCursor !== undefined);
 
-        return 'not_exists';
+        return status;
     }
 
     private async deleteSubscription(appToken: string, subscriptionID: string): Promise<void> {
@@ -156,7 +155,7 @@ export class TwitchAPI {
                 const subID = cachedSubs[type];
                 const newStatus = await this.getSubscriptionStatus(appToken, type, subID);
                 if (newStatus === 'enabled' || newStatus === 'webhook_callback_verification_pending') {
-                    logger.info(`Cached sub is valid for '${broadcasterID}'`);
+                    logger.debug(`Cached sub is valid for '${broadcasterID}'`);
                     return;
                 } else {
                     logger.warn(`Cached sub is invalid (${newStatus}) for '${broadcasterID}'`);
