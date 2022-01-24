@@ -113,14 +113,8 @@ export class TwitchAPI {
             });
             if (res.ok) {
                 const json = await res.json();
-
-                console.log(json);
-
                 const data = json['data'];
                 data.forEach(sub => {
-
-                    console.log(sub['id'] + '===' + subscriptionID);
-
                     if (sub['id'] === subscriptionID) {
                         return sub['status'];
                     }
@@ -132,7 +126,7 @@ export class TwitchAPI {
                 const errorMsg = await res.text();
                 throw new TwitchAPIError('get subscription status', res.status, errorMsg);
             }
-        } while (paginationCursor !== '');
+        } while (paginationCursor !== undefined);
 
         return 'not_exists';
     }
