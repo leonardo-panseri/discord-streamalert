@@ -78,7 +78,8 @@ export class TwitchAPI {
             this.saveData();
             return token;
         } else {
-            throw `Request to generate App Token failed with code ${res.status}"`;
+            const errorMsg = await res.text();
+            throw new TwitchAPIError('generate app token', res.status, errorMsg);
         }
     }
 
@@ -93,7 +94,8 @@ export class TwitchAPI {
             const json = await res.json();
             return json['data'][0]['id'];
         } else {
-            throw `Request to get user '${username}' failed with code ${res.status}"`;
+            const errorMsg = await res.text();
+            throw new TwitchAPIError('get user id', res.status, errorMsg);
         }
     }
 
@@ -111,19 +113,23 @@ export class TwitchAPI {
             });
             if (res.ok) {
                 const json = await res.json();
+
+                console.log(json);
+
                 const data = json['data'];
                 data.forEach(sub => {
 
-                    console.log(sub);
+                    console.log(sub['id'] + '===' + subscriptionID);
 
                     if (sub['id'] === subscriptionID) {
                         return sub['status'];
                     }
                 });
 
-                if (res['pagination'] !== undefined) paginationCursor = res['pagination']['cursor'];
+                paginationCursor = json['pagination']['cursor'];
             } else {
-                throw `Request to get EventSubs failed with code ${res.status}"`;
+                const errorMsg = await res.text();
+                throw new TwitchAPIError('get subscription status', res.status, errorMsg);
             }
         } while (paginationCursor !== undefined);
 
@@ -139,7 +145,8 @@ export class TwitchAPI {
             headers: headers,
         });
         if (!res.ok) {
-            throw `Request to delete EventSub ${subscriptionID} failed with code ${res.status}"`;
+            const errorMsg = await res.text();
+            throw new TwitchAPIError('delete subscription', res.status, errorMsg);
         }
     }
 
@@ -181,7 +188,7 @@ export class TwitchAPI {
             logger.info(`Subscribed to '${type}' for '${broadcasterID}'`);
         } else {
             const errorMsg = await res.text();
-            throw `Request to subscribe to '${type}' for '${broadcasterID}' failed with code ${res.status}\n${errorMsg}`;
+            throw new TwitchAPIError(`subscribe to '${type}'`, res.status, errorMsg);
         }
     }
 
@@ -195,9 +202,14 @@ export class TwitchAPI {
             'Client-Id': this._clientID,
             'Content-Type': 'application/json' };
 
-        await this.subscribeToEvent(token, headers, 'stream.online', broadcasterID, '/online');
-        await this.subscribeToEvent(token, headers, 'stream.offline', broadcasterID, '/offline');
-        await this.subscribeToEvent(token, headers, 'channel.update', broadcasterID, '/update');
+        try {
+            await this.subscribeToEvent(token, headers, 'stream.online', broadcasterID, '/online');
+            await this.subscribeToEvent(token, headers, 'stream.offline', broadcasterID, '/offline');
+            await this.subscribeToEvent(token, headers, 'channel.update', broadcasterID, '/update');
+        } catch (e) {
+            logger.error(e.message);
+            process.exit(1);
+        }
     }
 }
 
@@ -216,3 +228,8 @@ class EventSubPayload {
     }
 }
 
+class TwitchAPIError extends Error {
+    constructor(type: string, status, error) {
+        super(`Request '${type}' failed with code ${status}\nError: ${error}`);
+    }
+}
