@@ -103,9 +103,9 @@ export class TwitchAPI {
         const headers: HeadersInit = {
             'Authorization': `Bearer ${appToken}`,
             'Client-Id': this._clientID };
-        let paginationCursor = '';
+        let paginationCursor = undefined;
         do {
-            const params = paginationCursor === '' ? { 'type': type } : { 'type': type, 'after': paginationCursor };
+            const params = paginationCursor === undefined ? { 'type': type } : { 'type': type, 'after': paginationCursor };
             const url = getUrlWithParams(urls.EVENTSUB, params);
 
             const res = await fetch(url, {
@@ -127,6 +127,7 @@ export class TwitchAPI {
                 });
 
                 paginationCursor = json['pagination']['cursor'];
+                if (paginationCursor === '') paginationCursor = undefined;
             } else {
                 const errorMsg = await res.text();
                 throw new TwitchAPIError('get subscription status', res.status, errorMsg);
