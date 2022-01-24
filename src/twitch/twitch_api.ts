@@ -121,7 +121,7 @@ export class TwitchAPI {
                     }
                 });
 
-                paginationCursor = res['pagination']['cursor'];
+                if (res['pagination'] !== undefined) paginationCursor = res['pagination']['cursor'];
             } else {
                 throw `Request to get EventSubs failed with code ${res.status}"`;
             }
@@ -163,7 +163,6 @@ export class TwitchAPI {
 
         const payload = new EventSubPayload(type, broadcasterID, this._callbackBaseUrl + callbackRelativeUrl,
             this._callbackSecret);
-        console.log(JSON.stringify(payload));
         const res = await fetch(urls.EVENTSUB, {
             method: 'post',
             headers: headers,
