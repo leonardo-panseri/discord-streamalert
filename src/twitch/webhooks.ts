@@ -20,24 +20,37 @@ export function startWebserver(port: number, secret: string, onReady: () => void
     }));
 
     app.post('/online', (req, res) => {
-        console.log('POST /online: ', req.body);
-        if (!verifyRequestHmac(secret, req, res)) return;
-        if (!isNotification(req, res)) return;
+        handleRequest(secret, req, res, streamOnlineHandler);
     });
 
     app.post('/offline', (req, res) => {
-        console.log('POST /offline: ', req.body);
-        if (!verifyRequestHmac(secret, req, res)) return;
-        if (!isNotification(req, res)) return;
+        handleRequest(secret, req, res, streamOfflineHandler);
     });
 
     app.post('/update', (req, res) => {
-        console.log('POST /update: ', req.body);
-        if (!verifyRequestHmac(secret, req, res)) return;
-        if (!isNotification(req, res)) return;
+        handleRequest(secret, req, res, channelUpdateHandler);
     });
 
     app.listen(app.get('port'), onReady);
+}
+
+function handleRequest(secret: string, req, res, handler) {
+    if (!verifyRequestHmac(secret, req, res)) return;
+    if (!isNotification(req, res)) return;
+    const notification = JSON.parse(req.body);
+    handler(notification);
+}
+
+function streamOnlineHandler(notification) {
+    console.log('Stream online: ' + JSON.stringify(notification));
+}
+
+function streamOfflineHandler(notification) {
+    console.log('Stream offline: ' + JSON.stringify(notification));
+}
+
+function channelUpdateHandler(notification) {
+    console.log('Channel update: ' + JSON.stringify(notification));
 }
 
 function verifyRequestHmac(secret, req, res): boolean {
