@@ -1,0 +1,15 @@
+token: YOUR_TOKEN_HERE
+twitch_id_client: YOUR_TWITCH_ID_CLIENT_HERE
+twitch_secret: YOUR_TWITCH_SECRET_HERE
+webhooks_host: IP_OF_THE_SERVER_HERE
+webhooks_port: 3123
+webhooks_secret: SECRET_FOR_WEBHOOKS_HERE
+
+streams:
+  - broadcaster_username: username1
+    discord_user_id: 0
+    role_id: 0
+
+  - broadcaster_username: username2
+    discord_user_id: 0
+    role_id: 0
