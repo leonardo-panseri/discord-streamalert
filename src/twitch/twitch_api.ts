@@ -113,8 +113,12 @@ export class TwitchAPI {
             });
             if (res.ok) {
                 const json = await res.json();
-                const data = json['data'][0];
+                const data = json['data'];
                 data.forEach(sub => {
+                    console.log(sub);
+                    console.log(sub['id']);
+                    console.log(subscriptionID);
+
                     if (sub['id'] === subscriptionID) {
                         return sub['status'];
                     }
