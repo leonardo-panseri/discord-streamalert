@@ -20,12 +20,11 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 client.once('ready', () => {
     logger.info(`StreamAlert loaded in ${client.guilds.cache.size} guilds`);
 
-    const webhooksUrl = cfg['webhooks_host'] + ':' + cfg['webhooks_port'];
     const twitchAPI = new TwitchAPI(cfg['twitch_id_client'], cfg['twitch_secret'],
-        webhooksUrl, cfg['webhooks_secret']);
+        cfg['webhooks_host'], cfg['webhooks_secret']);
 
     startWebserver(cfg['webhooks_port'], cfg['webhooks_secret'], () => {
-        logger.info(`Started Webhooks webserver at '${webhooksUrl}'`);
+        logger.info(`Started Webhooks webserver at '${cfg['webhooks_host']}'`);
         cfg['streams'].forEach(sect => {
             twitchAPI.subscribeToStreamUpdates(sect['broadcaster_username'])
                 .then(() => logger.info('Finished subscribing process'));
