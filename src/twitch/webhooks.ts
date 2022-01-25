@@ -1,4 +1,5 @@
 import { logger } from '../index.js';
+import { onStreamOnline, onStreamOffline, onChannelUpdate } from '../stream_manager.js';
 import express from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 
@@ -38,19 +39,22 @@ function handleRequest(secret: string, req, res, handler) {
     if (!verifyRequestHmac(secret, req, res)) return;
     if (!isNotification(req, res)) return;
     const notification = JSON.parse(req.body);
-    handler(notification);
+    const broadcasterID = notification['event']['broadcaster_user_id'];
+    handler({ 'notification': notification, 'broadcasterID': broadcasterID });
 }
 
-function streamOnlineHandler(notification) {
-    console.log('Stream online: ' + JSON.stringify(notification));
+function streamOnlineHandler(options) {
+    const broadcasterName = options.notification['event']['broadcaster_user_name'];
+    onStreamOnline(options.broadcasterID, broadcasterName).then();
 }
 
-function streamOfflineHandler(notification) {
-    console.log('Stream offline: ' + JSON.stringify(notification));
+function streamOfflineHandler(options) {
+    onStreamOffline(options.broadcasterID).then();
 }
 
-function channelUpdateHandler(notification) {
-    console.log('Channel update: ' + JSON.stringify(notification));
+function channelUpdateHandler(options) {
+    const category = options.notification['event']['category_name'];
+    onChannelUpdate(options.broadcasterID, category).then();
 }
 
 function verifyRequestHmac(secret, req, res): boolean {

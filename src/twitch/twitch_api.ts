@@ -10,6 +10,7 @@ const urls = {
     'VALIDATE': BASE_OAUTH2_URL + '/validate',
     'USERS': BASE_HELIX_URL + '/users',
     'EVENTSUB': BASE_HELIX_URL + '/eventsub/subscriptions',
+    'STREAMS': BASE_HELIX_URL + '/streams',
 };
 
 const dataFile = getPathRelativeToProjectRoot('api_data.json');
@@ -206,6 +207,28 @@ export class TwitchAPI {
             await this.subscribeToEvent(token, headers, 'channel.update', broadcasterID, '/update');
         } catch (e) {
             logger.error(e.message);
+            process.exit(1);
+        }
+    }
+
+    async getStreamInfo(broadcasterID: string) {
+        const headers: HeadersInit = {
+            'Authorization': `Bearer ${await this.getAppToken()}`,
+            'Client-Id': this._clientID };
+        const res = await fetch(getUrlWithParams(urls.STREAMS, { 'user_id': broadcasterID }), {
+            headers: headers,
+        });
+        if (res.ok) {
+            const info = (await res.json())['data'][0];
+            if (!info) {
+                logger.error(`Invalid broadcasterID '${broadcasterID}'`);
+                process.exit(1);
+            }
+            return info;
+        } else {
+            const errorMsg = await res.text();
+            const err = new TwitchAPIError(`get channel info '${broadcasterID}'`, res.status, errorMsg);
+            logger.error(err.message);
             process.exit(1);
         }
     }

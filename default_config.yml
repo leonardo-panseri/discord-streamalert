@@ -1,13 +1,38 @@
+# Token for the Discord Bot
 token: YOUR_TOKEN_HERE
+
+# Client ID and secret for the Twitch API
 twitch_id_client: YOUR_TWITCH_ID_CLIENT_HERE
 twitch_secret: YOUR_TWITCH_SECRET_HERE
+
+# External address for webhooks that will be called from the Twitch API
+# You must set up a proxy on your web server that enables SSL for this URL (it must be https)
+# The proxy must be setup with the default https port (443)
 webhooks_host: IP_OF_THE_SERVER_HERE
+# The proxy must redirect to localhost with the following port (i.e. http://127.0.0.1:3123/)
 webhooks_port: 3123
+# Secret that will be used to verify that requests to the webhooks actually come from Twitch API
+# This should be a random string between 10 and 100 characters
 webhooks_secret: SECRET_FOR_WEBHOOKS_HERE
 
+# Twitch stream category that the bot will process notifications for
+stream_category: TWITCH_STREAM_CATEGORY_HERE
+
+# Discord channel ID for the channel were notifications for streams will be sent
+notification_channel: 0
+
+# Format for the notification embed
+embed:
+  color: "#FF5733"
+  title: "${name} is live!"
+
+# List of twitch channels that will be tracked by the bot
 streams:
+    # Login of the streamer
   - broadcaster_username: username1
+    # Discord user ID of the streamer in your server
     discord_user_id: 0
+    # Discord role ID that will be given to the streamer when he is streaming
     role_id: 0
 
   - broadcaster_username: username2
