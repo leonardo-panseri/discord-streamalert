@@ -9,6 +9,8 @@ const trackedMessagesFile = getPathRelativeToProjectRoot('tracked_messages.json'
 const trackedMessages: Record<string, number> = {};
 
 export async function onStreamOnline(broadcasterID, broadcasterName) {
+    logger.debug(`Stream online for ${broadcasterID}`);
+
     if (onlineStreams[broadcasterID] !== undefined) {
         logger.warn(`Received online notification for ${broadcasterName} stream that was already cached as online`);
         const msgID = onlineStreams[broadcasterID].messageID;
@@ -34,6 +36,8 @@ export async function onStreamOnline(broadcasterID, broadcasterName) {
 }
 
 export async function onStreamOffline(broadcasterID) {
+    logger.debug(`Stream online for ${broadcasterID}`);
+
     if (onlineStreams[broadcasterID] !== undefined) {
         const msgID = onlineStreams[broadcasterID].messageID;
         if (msgID !== undefined) {
@@ -44,6 +48,8 @@ export async function onStreamOffline(broadcasterID) {
 }
 
 export async function onChannelUpdate(broadcasterID, category) {
+    logger.debug(`Channel update for ${broadcasterID}`);
+
     if (onlineStreams[broadcasterID] !== undefined) {
         const msgID = onlineStreams[broadcasterID].messageID;
         if (msgID !== undefined) {
