@@ -222,7 +222,7 @@ export class TwitchAPI {
             const info = (await res.json())['data'][0];
             if (!info) {
                 logger.error(`Invalid broadcasterID '${broadcasterID}'`);
-                process.exit(1);
+                return undefined;
             }
             return info;
         } else {

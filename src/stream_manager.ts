@@ -21,6 +21,7 @@ export async function onStreamOnline(broadcasterID, broadcasterName) {
     }
 
     const streamInfo = await client['twitchAPI'].getStreamInfo(broadcasterID);
+    if (!streamInfo) return;
     const category = streamInfo['game_name'];
 
     const stream: StreamEvent = {
@@ -58,6 +59,7 @@ export async function onChannelUpdate(broadcasterID, category) {
             }
         } else if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
             const streamInfo = await client['twitchAPI'].getStreamInfo(broadcasterID);
+            if (!streamInfo) return;
             onlineStreams[broadcasterID].messageID = await sendStreamEmbed(streamInfo);
         }
     }
