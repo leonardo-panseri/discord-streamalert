@@ -227,7 +227,7 @@ export class TwitchAPI {
             return info;
         } else {
             const errorMsg = await res.text();
-            const err = new TwitchAPIError(`get channel info '${broadcasterID}'`, res.status, errorMsg);
+            const err = new TwitchAPIError(`get stream info '${broadcasterID}'`, res.status, errorMsg);
             logger.error(err.message);
             process.exit(1);
         }

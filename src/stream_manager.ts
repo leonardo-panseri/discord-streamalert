@@ -93,7 +93,7 @@ async function sendStreamEmbed(streamInfo): Promise<string> {
     const broadcasterLogin = streamInfo['user_login'];
     const broadcasterName = streamInfo['user_name'];
     const title = streamInfo['title'];
-    const thumbnailUrl = streamInfo['thumbnail_url'];
+    const thumbnailUrl = streamInfo['thumbnail_url'].replace('{width}', '440').replace('{height}', '248');
     const embed = createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUrl);
     const channel = await fetchNotificationChannel();
     const msg = await channel.send({ embeds: [embed] });
