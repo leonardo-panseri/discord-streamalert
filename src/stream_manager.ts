@@ -29,7 +29,7 @@ export async function onStreamOnline(broadcasterID, broadcasterName) {
         'messageID': undefined };
 
     if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
-        onlineStreams[broadcasterID].messageID = await sendStreamEmbed(streamInfo);
+        stream.messageID = await sendStreamEmbed(streamInfo);
     }
 
     onlineStreams[broadcasterID] = stream;
@@ -67,8 +67,8 @@ function createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUr
     const format = (templ, obj) => templ.replace(/\${([^}]*)}/g, (r, k) => obj[k]);
     return new MessageEmbed()
         .setColor(cfg['embed']['color'])
-        .setTitle(format(cfg['embed']['title'], broadcasterName))
-        .setDescription(format(cfg['embed']['description'], title))
+        .setTitle(format(cfg['embed']['title'], { 'name': broadcasterName }))
+        .setDescription(format(cfg['embed']['description'], { 'streamTitle': title }))
         .setURL(`https://www.twitch.tv/${broadcasterLogin}`)
         .setImage(thumbnailUrl)
         .setTimestamp();
