@@ -78,7 +78,11 @@ function createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUr
 
 async function deleteMessage(id, save = true) {
     const channel = await fetchNotificationChannel();
-    await channel.messages.delete(id);
+    try {
+        await channel.messages.delete(id);
+    } catch (e) {
+        logger.debug('Trying to delete a message that does not exists');
+    }
     if (save) {
         delete trackedMessages[id];
         saveTrackedMessages();
@@ -113,6 +117,7 @@ export async function cleanupTrackedMessages() {
         for (const msgID in toCleanup) {
             await deleteMessage(msgID, false);
         }
+        saveTrackedMessages();
     }
 }
 
