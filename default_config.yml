@@ -25,6 +25,7 @@ notification_channel: 0
 embed:
   color: "#FF5733"
   title: "${name} is live!"
+  description: "${streamTitle}"
 
 # List of twitch channels that will be tracked by the bot
 streams:
