@@ -228,7 +228,7 @@ export class TwitchApi {
             logger.debug(`Subscribed to '${type}' for '${broadcasterID}'`);
         } catch (e) {
             if (e instanceof TwitchApiError) {
-                logger.warn(`Already registered to ${type} for ${broadcasterID}\n${JSON.stringify(e.payload, null, 2)}`);
+                logger.warn(`Already registered to ${type} for ${broadcasterID}, check status manually`);
             } else {
                 throw e;
             }
@@ -285,6 +285,7 @@ export class TwitchApi {
             }
 
             if (res.ok) {
+                logger.debug(`Response: OK, payload: ${JSON.stringify(payload, null, 2)}`);
                 return payload;
             } else if (res.status === 401) {
                 logger.info('Twitch App Token has expired, requesting new one');
