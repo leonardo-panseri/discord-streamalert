@@ -255,6 +255,10 @@ export class TwitchApi {
         }
     }
 
+    /**
+     * Gets all subscriptions made to the EventSub endpoint
+     * @param updateCache if the result should be used to update cache (default: false)
+     */
     async getAllSubscriptions(updateCache = false) {
         const result = {};
         let paginationCursor = undefined;

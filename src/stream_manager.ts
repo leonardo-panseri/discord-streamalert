@@ -15,7 +15,7 @@ export async function onStreamOnline(broadcasterID, broadcasterName) {
         logger.warn(`Received online notification for ${broadcasterName} stream that was already cached as online`);
         const msgID = onlineStreams[broadcasterID].messageID;
         if (msgID !== undefined) {
-            await deleteMessage(msgID);
+            await deleteMessage(broadcasterID, msgID);
         }
         delete onlineStreams[broadcasterID];
     }
@@ -42,7 +42,7 @@ export async function onStreamOffline(broadcasterID) {
     if (onlineStreams[broadcasterID] !== undefined) {
         const msgID = onlineStreams[broadcasterID].messageID;
         if (msgID !== undefined) {
-            await deleteMessage(msgID);
+            await deleteMessage(broadcasterID, msgID);
         }
         delete onlineStreams[broadcasterID];
     }
@@ -53,9 +53,10 @@ export async function onChannelUpdate(broadcasterID, category) {
 
     if (onlineStreams[broadcasterID] !== undefined) {
         const msgID = onlineStreams[broadcasterID].messageID;
+        logger.debug(`Message id for ${broadcasterID}: ${msgID}`);
         if (msgID !== undefined) {
             if (category.toLowerCase() !== cfg['stream_category'].toLowerCase()) {
-                await deleteMessage(msgID);
+                await deleteMessage(broadcasterID, msgID);
             }
         } else if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
             const streamInfo = await client['twitchAPI'].getStreamInfo(broadcasterID);
@@ -76,15 +77,16 @@ function createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUr
         .setTimestamp();
 }
 
-async function deleteMessage(id, save = true) {
+async function deleteMessage(broadcasterId, messageId, save = true) {
     const channel = await fetchNotificationChannel();
     try {
-        await channel.messages.delete(id);
+        await channel.messages.delete(messageId);
     } catch (e) {
         logger.debug('Trying to delete a message that does not exists');
     }
     if (save) {
-        delete trackedMessages[id];
+        if (broadcasterId) onlineStreams[broadcasterId].messageID = undefined;
+        delete trackedMessages[messageId];
         saveTrackedMessages();
     }
 }
@@ -115,7 +117,7 @@ export async function cleanupTrackedMessages() {
     if (existsSync(trackedMessagesFile)) {
         const toCleanup = JSON.parse(readFileSync(trackedMessagesFile, 'utf8'));
         for (const msgID in toCleanup) {
-            await deleteMessage(msgID, false);
+            await deleteMessage(undefined, msgID, false);
         }
         saveTrackedMessages();
     }

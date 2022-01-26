@@ -8,7 +8,7 @@ import { getPathRelativeToProjectRoot } from './helper.js';
 import { existsSync } from 'fs';
 
 export const logger = createLogger({
-    level: 'info',
+    level: process.env.DEBUG ? 'debug' : 'info',
     format: format.simple(),
     transports: [
         new transports.Console(),
