@@ -192,10 +192,10 @@ export class TwitchApi {
      * @private
      */
     private async subscribeToEvent(type: string, broadcasterID: string, callbackRelativeUrl: string): Promise<void> {
-        let cachedSubscriptions: Record<string, string> = await this._cache.get(broadcasterID);
+        let cachedSubscriptions = await this._cache.get(broadcasterID);
         if (cachedSubscriptions !== undefined) {
             if (cachedSubscriptions[type] !== undefined) {
-                const subID = cachedSubscriptions[type];
+                const subID = cachedSubscriptions[type]['id'];
                 const newStatus = await this.getSubscriptionStatus(type, subID);
                 if (newStatus === 'enabled') {
                     logger.debug(`Cached sub is valid for '${broadcasterID}'`);
@@ -223,12 +223,19 @@ export class TwitchApi {
                 headers: await this.getHeaders({ json: true }),
                 body: JSON.stringify(payload),
             }, [ 409 ]);
-            cachedSubscriptions[type] = res['data'][0]['id'];
+            const id = res['data'][0]['id'];
+            const status = res['data'][0]['status'];
+            cachedSubscriptions[type] = {
+                'id': id,
+                'status': status,
+            };
             await this._cache.set(broadcasterID, cachedSubscriptions);
             logger.debug(`Subscribed to '${type}' for '${broadcasterID}'`);
         } catch (e) {
             if (e instanceof TwitchApiError) {
-                logger.warn(`Already registered to ${type} for ${broadcasterID}, check status manually`);
+                logger.warn(`Already registered to ${type} for ${broadcasterID}, trying to fix`);
+                await this.getAllSubscriptions(true);
+                await this.subscribeToEvent(type, broadcasterID, callbackRelativeUrl);
             } else {
                 throw e;
             }
@@ -248,17 +255,60 @@ export class TwitchApi {
         }
     }
 
+    async getAllSubscriptions(updateCache = false) {
+        const result = {};
+        let paginationCursor = undefined;
+        do {
+            const params = { 'after': paginationCursor };
+            const url = paginationCursor === undefined ?
+                TwitchApi.urls.EVENTSUB :
+                TwitchApi.getUrlWithParams(TwitchApi.urls.EVENTSUB, params);
+
+            const res = await this.makeApiCall(url, {
+                headers: await this.getHeaders(),
+            });
+
+            const data = res['data'];
+            for (const sub of data) {
+                const broadcasterId = sub['condition']['broadcaster_user_id'];
+                const type = sub['type'];
+                const id = sub['id'];
+                const status = sub['status'];
+
+                if (result[broadcasterId] === undefined) result[broadcasterId] = {};
+                if (result[broadcasterId][type] === undefined) result[broadcasterId][type] = {};
+
+                result[broadcasterId][type] = {
+                    'id': id,
+                    'status': status,
+                };
+            }
+
+            paginationCursor = res['pagination']['cursor'];
+            if (paginationCursor === '') paginationCursor = undefined;
+        } while (paginationCursor !== undefined);
+
+        logger.debug(`Subscriptions: ${JSON.stringify(result, null, 2)}`);
+
+        if (updateCache) {
+            for (const broadcasterId in result) {
+                await this._cache.set(broadcasterId, result[broadcasterId]);
+            }
+        }
+        return result;
+    }
+
     /**
      * Gets stream info for the given broadcaster's stream.
-     * @param broadcasterID the id of the broadcaster
+     * @param broadcasterId the id of the broadcaster
      */
-    async getStreamInfo(broadcasterID: string) {
-        const url = TwitchApi.getUrlWithParams(TwitchApi.urls.STREAMS, { 'user_id': broadcasterID });
+    async getStreamInfo(broadcasterId: string) {
+        const url = TwitchApi.getUrlWithParams(TwitchApi.urls.STREAMS, { 'user_id': broadcasterId });
         const res = await this.makeApiCall(url, { headers: await this.getHeaders() });
         if (res) {
             const info = res['data'][0];
             if (!info) {
-                logger.error(`Invalid broadcasterID '${broadcasterID}'`);
+                logger.error(`Invalid broadcasterID '${broadcasterId}'`);
                 return undefined;
             }
             return info;
