@@ -1,5 +1,5 @@
 import { logger, dataFilePath } from '../index.js';
-import fetch from 'node-fetch';
+import fetch, { RequestInit } from 'node-fetch';
 import Keyv from 'keyv';
 
 /** Payload to send to subscribe to an event of the EventSub endpoint */
@@ -15,6 +15,15 @@ class EventSubPayload {
         this.condition['broadcaster_user_id'] = broadcasterID;
         this.transport['callback'] = callbackUrl;
         this.transport['secret'] = callbackSecret;
+    }
+}
+
+/** Represents an error that has occurred while interacting with the API */
+class TwitchApiError extends Error {
+    payload;
+    constructor(message: string, payload) {
+        super(message);
+        this.payload = payload;
     }
 }
 
@@ -208,14 +217,22 @@ export class TwitchApi {
         const payload = new EventSubPayload(type, broadcasterID, this._callbackBaseUrl + callbackRelativeUrl,
             this._callbackSecret);
 
-        const res = await this.makeApiCall(TwitchApi.urls.EVENTSUB, {
-            method: 'post',
-            headers: this.getHeaders({ json: true }),
-            body: JSON.stringify(payload),
-        });
-        cachedSubscriptions[type] = res['data'][0]['id'];
-        await this._cache.set(broadcasterID, cachedSubscriptions);
-        logger.debug(`Subscribed to '${type}' for '${broadcasterID}'`);
+        try {
+            const res = await this.makeApiCall(TwitchApi.urls.EVENTSUB, {
+                method: 'post',
+                headers: this.getHeaders({ json: true }),
+                body: JSON.stringify(payload),
+            }, [ 409 ]);
+            cachedSubscriptions[type] = res['data'][0]['id'];
+            await this._cache.set(broadcasterID, cachedSubscriptions);
+            logger.debug(`Subscribed to '${type}' for '${broadcasterID}'`);
+        } catch (e) {
+            if (e instanceof TwitchApiError) {
+                logger.warn(`Already registered to ${type} for ${broadcasterID}\n${JSON.stringify(e.payload, null, 2)}`);
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**
@@ -252,23 +269,27 @@ export class TwitchApi {
      * Makes a call to the specified API endpoint and handles errors. If the call is successful returns the payload of the response.
      * @param url the url of the endpoint
      * @param options the options for the request
+     * @param errorStatusCodes optional list of status codes that will throw errors to the caller
      * @private
      */
-    private async makeApiCall(url, options): Promise<object> {
+    private async makeApiCall(url: string, options: RequestInit, errorStatusCodes: number[] = []): Promise<object> {
         let attemptLeft = 2;
         do {
             const res = await fetch(url, options);
-            let payload = undefined;
+            let payload = {};
             try {
                 payload = await res.json() as Promise<object>;
             } catch (e) {
                 if (!(e instanceof SyntaxError)) throw e;
             }
+
             if (res.ok) {
                 return payload;
             } else if (res.status === 401) {
                 logger.info('Twitch App Token has expired, requesting new one');
                 await this.getAppToken(true);
+            } else if (errorStatusCodes.includes(res.status)) {
+                throw new TwitchApiError(`Api error with status ${res.status}`, payload);
             } else {
                 logger.error(`Request to '${url}' failed with code ${res.status}\n${JSON.stringify(payload, null, 2)}`);
                 return undefined;
