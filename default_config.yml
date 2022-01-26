@@ -21,6 +21,9 @@ stream_category: TWITCH_STREAM_CATEGORY_HERE
 # Discord channel ID for the channel were notifications for streams will be sent
 notification_channel: 0
 
+# SQLite3 database file, must be created before starting the bot
+database_file: data.sqlite
+
 # Format for the notification embed
 embed:
   color: "#FF5733"

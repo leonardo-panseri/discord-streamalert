@@ -37,7 +37,7 @@ export async function onStreamOnline(broadcasterID, broadcasterName) {
 }
 
 export async function onStreamOffline(broadcasterID) {
-    logger.debug(`Stream online for ${broadcasterID}`);
+    logger.debug(`Stream offline for ${broadcasterID}`);
 
     if (onlineStreams[broadcasterID] !== undefined) {
         const msgID = onlineStreams[broadcasterID].messageID;

@@ -1,6 +1,7 @@
 api_data.json
 tracked_messages.json
 config.yml
+data.sqlite
 node_modules
 dist
 .idea
