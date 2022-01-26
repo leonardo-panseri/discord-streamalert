@@ -75,8 +75,8 @@ export class TwitchApi {
      * @param options.json if the content type should be set to json (default: false)
      * @private
      */
-    private getHeaders({ clientId = true, json = false } = {}): HeadersInit {
-        const headers: HeadersInit = { 'Authorization': `Bearer ${this.getAppToken(false)}` };
+    private async getHeaders({ clientId = true, json = false } = {}): Promise<HeadersInit> {
+        const headers: HeadersInit = { 'Authorization': `Bearer ${await this.getAppToken(false)}` };
         if (clientId) headers['Client-Id'] = this._clientId;
         if (json) headers['Content-Type'] = 'application/json';
         return headers;
@@ -88,7 +88,7 @@ export class TwitchApi {
      */
     private async validateAppToken(): Promise<boolean> {
         const res = await fetch(TwitchApi.urls.VALIDATE, {
-            headers: this.getHeaders({ clientId: false }),
+            headers: await this.getHeaders({ clientId: false }),
         });
         return res.ok;
     }
@@ -132,7 +132,7 @@ export class TwitchApi {
     private async getUserID(username: string): Promise<string> {
         const url = TwitchApi.getUrlWithParams(TwitchApi.urls.USERS, { 'login': username });
         const res = await this.makeApiCall(url, {
-            headers: this.getHeaders(),
+            headers: await this.getHeaders(),
         });
         if (!res['data'][0]) {
             logger.warn(`No user with username ${username}`);
@@ -154,7 +154,7 @@ export class TwitchApi {
             const url = TwitchApi.getUrlWithParams(TwitchApi.urls.EVENTSUB, params);
 
             const res = await this.makeApiCall(url, {
-                headers: this.getHeaders(),
+                headers: await this.getHeaders(),
             });
 
             const data = res['data'];
@@ -180,7 +180,7 @@ export class TwitchApi {
         const url = TwitchApi.getUrlWithParams(TwitchApi.urls.EVENTSUB, { 'id': subscriptionID });
         await this.makeApiCall(url, {
             method: 'delete',
-            headers: this.getHeaders(),
+            headers: await this.getHeaders(),
         });
     }
 
@@ -220,7 +220,7 @@ export class TwitchApi {
         try {
             const res = await this.makeApiCall(TwitchApi.urls.EVENTSUB, {
                 method: 'post',
-                headers: this.getHeaders({ json: true }),
+                headers: await this.getHeaders({ json: true }),
                 body: JSON.stringify(payload),
             }, [ 409 ]);
             cachedSubscriptions[type] = res['data'][0]['id'];
@@ -254,7 +254,7 @@ export class TwitchApi {
      */
     async getStreamInfo(broadcasterID: string) {
         const url = TwitchApi.getUrlWithParams(TwitchApi.urls.STREAMS, { 'user_id': broadcasterID });
-        const res = await this.makeApiCall(url, { headers: this.getHeaders() });
+        const res = await this.makeApiCall(url, { headers: await this.getHeaders() });
         if (res) {
             const info = res['data'][0];
             if (!info) {
@@ -273,6 +273,7 @@ export class TwitchApi {
      * @private
      */
     private async makeApiCall(url: string, options: RequestInit, errorStatusCodes: number[] = []): Promise<object> {
+        logger.debug(`Making API call to: ${url} with options: ${JSON.stringify(options, null, 2)}`);
         let attemptLeft = 2;
         do {
             const res = await fetch(url, options);
