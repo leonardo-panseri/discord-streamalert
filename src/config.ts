@@ -1,7 +1,9 @@
-import { logger } from './index.js';
+import { getLogger } from './index.js';
 import { parse } from 'yaml';
 import { existsSync, copyFileSync, readFileSync } from 'fs';
 import { getPathRelativeToProjectRoot } from './helper.js';
+
+const logger = getLogger();
 
 const DEFAULT_CONFIG_FILE = getPathRelativeToProjectRoot('default_config.yml');
 const CONFIG_FILE = getPathRelativeToProjectRoot('config.yml');

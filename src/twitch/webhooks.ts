@@ -1,109 +1,183 @@
-import { logger } from '../index.js';
+import { getLogger } from '../index.js';
 import { onStreamOnline, onStreamOffline, onChannelUpdate } from '../stream_manager.js';
-import express from 'express';
+import express, { Express, Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 
-// Notification request headers
-const TWITCH_MESSAGE_ID = 'Twitch-Eventsub-Message-Id'.toLowerCase();
-const TWITCH_MESSAGE_TIMESTAMP = 'Twitch-Eventsub-Message-Timestamp'.toLowerCase();
-const TWITCH_MESSAGE_SIGNATURE = 'Twitch-Eventsub-Message-Signature'.toLowerCase();
-const TWITCH_MESSAGE_TYPE = 'Twitch-Eventsub-Message-Type'.toLowerCase();
+const logger = getLogger('Webhooks');
 
-// Prepend this string to the HMAC that's created from the message
-const HMAC_PREFIX = 'sha256=';
-
-export function startWebserver(port: number, secret: string, onReady: () => void) {
-    const app = express();
-
-    app.set('port', port);
-    app.use(express.raw({
-        type: 'application/json',
-    }));
-
-    app.post('/online', (req, res) => {
-        handleRequest(secret, req, res, streamOnlineHandler);
-    });
-
-    app.post('/offline', (req, res) => {
-        handleRequest(secret, req, res, streamOfflineHandler);
-    });
-
-    app.post('/update', (req, res) => {
-        handleRequest(secret, req, res, channelUpdateHandler);
-    });
-
-    app.listen(app.get('port'), onReady);
+/** Represents a Twitch EventSub notification */
+interface Notification {
+    'payload': object,
+    'broadcasterId': string
 }
 
-function handleRequest(secret: string, req, res, handler) {
-    if (!verifyRequestHmac(secret, req, res)) return;
-    if (!isNotification(req, res)) return;
-    const notification = JSON.parse(req.body);
-    const broadcasterID = notification['event']['broadcaster_user_id'];
-    handler({ 'notification': notification, 'broadcasterID': broadcasterID });
-}
+/** Manages the web app that receives and handles Twitch EventSub updates through webhooks */
+export class Webhooks {
+    // Notification request headers
+    private static readonly TWITCH_MESSAGE_ID = 'Twitch-Eventsub-Message-Id'.toLowerCase();
+    private static readonly TWITCH_MESSAGE_TIMESTAMP = 'Twitch-Eventsub-Message-Timestamp'.toLowerCase();
+    private static readonly TWITCH_MESSAGE_SIGNATURE = 'Twitch-Eventsub-Message-Signature'.toLowerCase();
+    private static readonly TWITCH_MESSAGE_TYPE = 'Twitch-Eventsub-Message-Type'.toLowerCase();
 
-function streamOnlineHandler(options) {
-    const broadcasterName = options.notification['event']['broadcaster_user_name'];
-    onStreamOnline(options.broadcasterID, broadcasterName).then();
-}
+    // Prepend this string to the HMAC that's created from the message
+    private static readonly HMAC_PREFIX = 'sha256=';
 
-function streamOfflineHandler(options) {
-    onStreamOffline(options.broadcasterID).then();
-}
+    /** Internal port to run the webserver on */
+    private readonly _port: number;
+    /** Secret to verify that messages are sent from Twitch */
+    private readonly _secret: string;
+    /** Function to call when the webserver has finished loading */
+    private readonly _onReady: () => void;
 
-function channelUpdateHandler(options) {
-    const category = options.notification['event']['category_name'];
-    onChannelUpdate(options.broadcasterID, category).then();
-}
+    private _app: Express;
 
-function verifyRequestHmac(secret, req, res): boolean {
-    const message = getHmacMessage(req);
-    const hmac = HMAC_PREFIX + getHmac(secret, message);
+    constructor(port: number, secret: string, onReady: () => void) {
+        this._port = port;
+        this._secret = secret;
+        this._onReady = onReady;
+    }
 
-    if (verifyMessage(hmac, req.headers[TWITCH_MESSAGE_SIGNATURE])) {
-        return true;
-    } else {
-        logger.warn('Received request with invalid hmac');
-        res.sendStatus(403);
+    /** Instantiate and set up a new Express app and starts it on the given port */
+    startWebserver(): void {
+        this._app = express();
+
+        this._app.use(express.raw({
+            type: 'application/json',
+        }));
+
+        this._app.post('/online', (req, res) => {
+            this.handleRequest(req, res, Webhooks.streamOnlineHandler);
+        });
+
+        this._app.post('/offline', (req, res) => {
+            this.handleRequest(req, res, Webhooks.streamOfflineHandler);
+        });
+
+        this._app.post('/update', (req, res) => {
+            this.handleRequest(req, res, Webhooks.channelUpdateHandler);
+        });
+
+        this._app.listen(this._port, this._onReady);
+    }
+
+    /**
+     * Builds the message used to get the HMAC.
+     * @param req the request to build the HMAC for
+     * @private
+     */
+    private static getHmacMessage(req: Request): string {
+        return (req.headers[Webhooks.TWITCH_MESSAGE_ID] as string +
+            req.headers[Webhooks.TWITCH_MESSAGE_TIMESTAMP] +
+            req.body);
+    }
+
+    /**
+     * Gets the HMAC for the given message.
+     * @param message the message
+     * @private
+     */
+    private getHmac(message: string): string {
+        return createHmac('sha256', this._secret)
+            .update(message)
+            .digest('hex');
+    }
+
+    /**
+     * Verifies that the HMAC of the request is valid, sends status 403 if it is not.
+     * @param req the received request
+     * @param res the response object to send status codes to
+     * @private
+     */
+    private verifyRequestHmac(req: Request, res: Response): boolean {
+        const message = Webhooks.getHmacMessage(req);
+        const hmac = Webhooks.HMAC_PREFIX + this.getHmac(message);
+        const receivedHmac: string = req.headers[Webhooks.TWITCH_MESSAGE_SIGNATURE] as string;
+
+        const valid = timingSafeEqual(Buffer.from(hmac), Buffer.from(receivedHmac));
+        if (valid) {
+            return true;
+        } else {
+            logger.warn('Received request with invalid hmac');
+            res.sendStatus(403);
+            return false;
+        }
+    }
+
+    /**
+     * Verifies the type of request and send status codes accordingly, if type is 'notification' returns true
+     * @param req the received request
+     * @param res the response object to send status codes to
+     * @private
+     */
+    private static isNotification(req: Request, res: Response): boolean {
+        const message = JSON.parse(req.body);
+        const reqType: string = req.headers[Webhooks.TWITCH_MESSAGE_TYPE] as string;
+        switch (reqType) {
+        case 'notification':
+            res.sendStatus(200);
+            return true;
+        case 'webhook_callback_verification':
+            res.status(200).send(message.challenge);
+            break;
+        case 'revocation':
+            res.sendStatus(204);
+
+            logger.warn(`${message.subscription.type} notifications revoked!`);
+            logger.warn(`reason: ${message.subscription.status}`);
+            logger.warn(`condition: ${JSON.stringify(message.subscription.condition, null, 4)}`);
+            break;
+        default:
+            res.sendStatus(200);
+            logger.warn(`Received request of unknown type '${reqType}'`);
+            break;
+        }
         return false;
     }
-}
 
-function isNotification(req, res): boolean {
-    const message = JSON.parse(req.body);
-    switch (req.headers[TWITCH_MESSAGE_TYPE]) {
-    case 'notification':
-        res.sendStatus(200);
-        return true;
-    case 'webhook_callback_verification':
-        res.status(200).send(message.challenge);
-        break;
-    case 'revocation':
-        res.sendStatus(204);
-
-        logger.warn(`${message.subscription.type} notifications revoked!`);
-        logger.warn(`reason: ${message.subscription.status}`);
-        logger.warn(`condition: ${JSON.stringify(message.subscription.condition, null, 4)}`);
-        break;
+    /**
+     * Handles an incoming request.
+     * @param req the request object
+     * @param res the response object to send status codes to
+     * @param handler the function that will handle this request's notification
+     * @private
+     */
+    private handleRequest(req: Request, res: Response, handler: (notification: Notification) => void): void {
+        if (!this.verifyRequestHmac(req, res)) return;
+        if (!Webhooks.isNotification(req, res)) return;
+        const payload = JSON.parse(req.body);
+        const broadcasterId = payload['event']['broadcaster_user_id'];
+        handler({ 'payload': payload, 'broadcasterId': broadcasterId });
     }
-}
 
-// Build the message used to get the HMAC.
-function getHmacMessage(request) {
-    return (request.headers[TWITCH_MESSAGE_ID] +
-        request.headers[TWITCH_MESSAGE_TIMESTAMP] +
-        request.body);
-}
+    /**
+     * Handles the stream.online notification.
+     * @param notification the notification that has been received
+     * @private
+     */
+    private static streamOnlineHandler(notification: Notification): void {
+        const broadcasterName = notification.payload['event']['broadcaster_user_name'];
+        onStreamOnline(notification.broadcasterId, broadcasterName)
+            .then(() => logger.debug('Finished handling of stream.online notification'));
+    }
 
-// Get the HMAC.
-function getHmac(secret, message) {
-    return createHmac('sha256', secret)
-        .update(message)
-        .digest('hex');
-}
+    /**
+     * Handles the stream.offline notification.
+     * @param notification the notification that has been received
+     * @private
+     */
+    private static streamOfflineHandler(notification: Notification): void {
+        onStreamOffline(notification.broadcasterId)
+            .then(() => logger.debug('Finished handling of stream.offline notification'));
+    }
 
-// Verify whether your signature matches Twitch's signature.
-function verifyMessage(hmac, verifySignature) {
-    return timingSafeEqual(Buffer.from(hmac), Buffer.from(verifySignature));
+    /**
+     * Handles the channel.update notification.
+     * @param notification the notification that has been received
+     * @private
+     */
+    private static channelUpdateHandler(notification: Notification): void {
+        const category = notification.payload['event']['category_name'];
+        onChannelUpdate(notification.broadcasterId, category)
+            .then(() => logger.debug('Finished handling of channel.update notification'));
+    }
 }

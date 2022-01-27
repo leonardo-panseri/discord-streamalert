@@ -1,7 +1,9 @@
-import { logger, client, cfg } from './index.js';
+import { getLogger, client, cfg } from './index.js';
 import { MessageEmbed, Snowflake, TextChannel } from 'discord.js';
 import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { getPathRelativeToProjectRoot } from './helper.js';
+
+const logger = getLogger('StreamManager');
 
 const onlineStreams: Record<string, StreamEvent> = {};
 

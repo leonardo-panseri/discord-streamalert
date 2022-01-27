@@ -1,6 +1,8 @@
-import { logger, dataFilePath } from '../index.js';
+import { getLogger, dataFilePath } from '../index.js';
 import fetch, { RequestInit } from 'node-fetch';
 import Keyv from 'keyv';
+
+const logger = getLogger('TwitchAPI');
 
 /** Payload to send to subscribe to an event of the EventSub endpoint */
 class EventSubPayload {
