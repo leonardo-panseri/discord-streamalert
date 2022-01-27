@@ -1,5 +1,5 @@
 import { getLogger } from '../index.js';
-import { onStreamOnline, onStreamOffline, onChannelUpdate } from '../stream_manager.js';
+import { StreamManager } from '../stream_manager.js';
 import express, { Express, Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 
@@ -22,6 +22,7 @@ export class Webhooks {
     // Prepend this string to the HMAC that's created from the message
     private static readonly HMAC_PREFIX = 'sha256=';
 
+    private readonly _streamManager: StreamManager;
     /** Internal port to run the webserver on */
     private readonly _port: number;
     /** Secret to verify that messages are sent from Twitch */
@@ -31,7 +32,8 @@ export class Webhooks {
 
     private _app: Express;
 
-    constructor(port: number, secret: string, onReady: () => void) {
+    constructor(streamManager: StreamManager, port: number, secret: string, onReady: () => void) {
+        this._streamManager = streamManager;
         this._port = port;
         this._secret = secret;
         this._onReady = onReady;
@@ -46,15 +48,15 @@ export class Webhooks {
         }));
 
         this._app.post('/online', (req, res) => {
-            this.handleRequest(req, res, Webhooks.streamOnlineHandler);
+            this.handleRequest(req, res, this.streamOnlineHandler);
         });
 
         this._app.post('/offline', (req, res) => {
-            this.handleRequest(req, res, Webhooks.streamOfflineHandler);
+            this.handleRequest(req, res, this.streamOfflineHandler);
         });
 
         this._app.post('/update', (req, res) => {
-            this.handleRequest(req, res, Webhooks.channelUpdateHandler);
+            this.handleRequest(req, res, this.channelUpdateHandler);
         });
 
         this._app.listen(this._port, this._onReady);
@@ -154,9 +156,9 @@ export class Webhooks {
      * @param notification the notification that has been received
      * @private
      */
-    private static streamOnlineHandler(notification: Notification): void {
+    private streamOnlineHandler(notification: Notification): void {
         const broadcasterName = notification.payload['event']['broadcaster_user_name'];
-        onStreamOnline(notification.broadcasterId, broadcasterName)
+        this._streamManager.onStreamOnline(notification.broadcasterId, broadcasterName)
             .then(() => logger.debug('Finished handling of stream.online notification'));
     }
 
@@ -165,8 +167,8 @@ export class Webhooks {
      * @param notification the notification that has been received
      * @private
      */
-    private static streamOfflineHandler(notification: Notification): void {
-        onStreamOffline(notification.broadcasterId)
+    private streamOfflineHandler(notification: Notification): void {
+        this._streamManager.onStreamOffline(notification.broadcasterId)
             .then(() => logger.debug('Finished handling of stream.offline notification'));
     }
 
@@ -175,9 +177,9 @@ export class Webhooks {
      * @param notification the notification that has been received
      * @private
      */
-    private static channelUpdateHandler(notification: Notification): void {
+    private channelUpdateHandler(notification: Notification): void {
         const category = notification.payload['event']['category_name'];
-        onChannelUpdate(notification.broadcasterId, category)
+        this._streamManager.onChannelUpdate(notification.broadcasterId, category)
             .then(() => logger.debug('Finished handling of channel.update notification'));
     }
 }
