@@ -7,7 +7,8 @@ export interface JsonPayload {
     [key: string]: string | number | boolean | JsonPayload | JsonPayload[],
 }
 
-export function getPathRelativeToProjectRoot(relativePath: string): string {
+export function getPathRelativeToProjectRoot(relativePath?: string): string {
+    if (!relativePath) return join(__dirname, '..');
     return join(__dirname, '..', relativePath);
 }
 

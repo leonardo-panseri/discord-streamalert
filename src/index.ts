@@ -43,29 +43,34 @@ class Bot {
         this._client.on('interactionCreate', interaction => {
             if (!interaction.isCommand()) return;
 
-            this._cmdManager.handleCommandInteraction(interaction as CommandInteraction);
+            bot?._cmdManager.handleCommandInteraction(interaction as CommandInteraction);
         });
 
         this._client.once('ready', this.onReady);
     }
 
     private async onReady() {
-        const guildsNum = this._client.guilds.cache.size;
+        if (!bot) {
+            logger.error('Bot is null');
+            return;
+        }
+        const guildsNum = bot._client.guilds.cache.size;
         logger.info(`StreamAlert loaded in ${guildsNum} guild`);
         if (guildsNum) logger.warn('This bot is meant to be used on a single server only');
 
-        this.twitchApi = new TwitchApi(
-            this.cfg.getString('twitch_id_client'), this.cfg.getString('twitch_secret'),
-            this.cfg.getString('webhooks_host'), this.cfg.getString('webhooks_secret'),
-            this._dataFilePath);
+        bot.twitchApi = new TwitchApi(
+            bot.cfg.getString('twitch_id_client'), bot.cfg.getString('twitch_secret'),
+            bot.cfg.getString('webhooks_host'), bot.cfg.getString('webhooks_secret'),
+            bot._dataFilePath);
 
-        this.streamManager = new StreamManager(this._client, this.twitchApi, this._dataFilePath, this.cfg);
+        bot.streamManager = new StreamManager(bot._client, bot.twitchApi, bot._dataFilePath, bot.cfg);
 
-        const webhooks = new Webhooks(this.streamManager, this.cfg.getNumber('webhooks_port'), this.cfg.getString('webhooks_secret'), () => {
-            logger.info(`Started Webhooks webserver at '${this.cfg.getString('webhooks_host')}'`);
-            for (const login of this.cfg.getSection('streams')) {
+        const webhooks = new Webhooks(bot.streamManager, bot.cfg.getNumber('webhooks_port'), bot.cfg.getString('webhooks_secret'), () => {
+            if (!bot) return;
+            logger.info(`Started Webhooks webserver at '${bot.cfg.getString('webhooks_host')}'`);
+            for (const login of bot.cfg.getSection('streams')) {
                 if (login) {
-                    this.twitchApi?.subscribeToStreamUpdates(login)
+                    bot.twitchApi?.subscribeToStreamUpdates(login)
                         .then(() => logger.info('Finished subscribing process'));
                 }
             }
@@ -81,7 +86,7 @@ class Bot {
 
 export default bot;
 
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+if (import.meta.url.replace('/dist/index.js', '') === url.pathToFileURL(process.argv[1]).href) {
     bot = new Bot();
     bot.start();
 }
