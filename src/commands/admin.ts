@@ -16,7 +16,7 @@ export const listStreamers: Command = {
         if (!subs) return;
 
         const embed = new MessageEmbed().setColor('GREEN');
-
+        let description = '';
         for (const id in subs) {
             const name = subs[id].name;
             let valid = true;
@@ -27,8 +27,9 @@ export const listStreamers: Command = {
                     if (status !== 'enabled') valid = false;
                 }
             }
-            embed.addField('', `- ${name}: ${valid ? 'valid' : 'invalid'}`);
+            description += `- ${name}: ${valid ? 'valid' : 'invalid'}\n`;
         }
+        embed.setDescription(description);
         interaction.reply({ embeds: [embed] }).then();
     },
 };

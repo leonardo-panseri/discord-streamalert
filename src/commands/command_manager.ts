@@ -28,7 +28,7 @@ export class CommandManager {
         if (!command) return;
 
         command.execute(bot, interaction).catch(e => {
-            logger.error(e);
+            logger.error(`Interaction '${interaction.commandName}': ${e}`);
             interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true })
                 .then();
         });
