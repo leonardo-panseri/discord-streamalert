@@ -13,7 +13,7 @@ const logger = log();
 
 let bot: Bot | undefined = undefined;
 
-class Bot {
+export class Bot {
     readonly cfg;
     private readonly _dataFilePath;
 
@@ -42,8 +42,9 @@ class Bot {
     private registerEventListeners() {
         this._client.on('interactionCreate', interaction => {
             if (!interaction.isCommand()) return;
+            if (!bot) return;
 
-            bot?._cmdManager.handleCommandInteraction(interaction as CommandInteraction);
+            bot._cmdManager.handleCommandInteraction(bot, interaction as CommandInteraction);
         });
 
         this._client.once('ready', this.onReady);
@@ -83,8 +84,6 @@ class Bot {
             .then(() => logger.debug('Bot has logged in'));
     }
 }
-
-export default bot;
 
 if (import.meta.url.replace('/dist/index.js', '') === url.pathToFileURL(process.argv[1]).href) {
     bot = new Bot();

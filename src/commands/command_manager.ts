@@ -5,12 +5,13 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { Config } from '../config.js';
 import { addStreamer, listStreamers, removeStreamer } from './admin.js';
+import { Bot } from '../index.js';
 
 const logger = log('CommandManager');
 
 export interface Command {
     readonly data: SlashCommandBuilder;
-    readonly execute: (interaction: CommandInteraction) => Promise<void>;
+    readonly execute: (bot: Bot, interaction: CommandInteraction) => Promise<void>;
 }
 
 export class CommandManager {
@@ -22,11 +23,11 @@ export class CommandManager {
         this.addCommand(removeStreamer);
     }
 
-    handleCommandInteraction(interaction: CommandInteraction): void {
+    handleCommandInteraction(bot: Bot, interaction: CommandInteraction): void {
         const command = this._commands[interaction.commandName];
         if (!command) return;
 
-        command.execute(interaction).catch(e => {
+        command.execute(bot, interaction).catch(e => {
             logger.error(e);
             interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true })
                 .then();

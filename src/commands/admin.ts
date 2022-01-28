@@ -1,4 +1,3 @@
-import bot from '../index.js' ;
 import { Command } from './command_manager.js';
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { MessageEmbed, Role, User } from 'discord.js';
@@ -10,7 +9,7 @@ export const listStreamers: Command = {
     data: new SlashCommandBuilder()
         .setName('liststreamers')
         .setDescription('Prints a list of all registered streamers'),
-    execute: async (interaction) => {
+    execute: async (bot, interaction) => {
         if (!bot) return;
 
         const subs = await bot.twitchApi?.getAllSubscriptions(true, true);
@@ -41,7 +40,7 @@ export const addStreamer: Command = {
         .addUserOption(option => option.setName('user').setDescription('The Discord user'))
         .addStringOption(option => option.setName('twitch_login').setDescription('The login of the streamer on twitch'))
         .addRoleOption(option => option.setName('role').setDescription('The role to grant to the streamer while he is streaming')) as SlashCommandBuilder,
-    execute: async (interaction) => {
+    execute: async (bot, interaction) => {
         if (!bot) return;
 
         const user = interaction.options.getUser('user') as User;
@@ -62,7 +61,7 @@ export const removeStreamer: Command = {
         .setName('removestreamer')
         .setDescription('Removes a registered streamer')
         .addUserOption(option => option.setName('user').setDescription('The Discord user to remove')) as SlashCommandBuilder,
-    execute: async (interaction) => {
+    execute: async (bot, interaction) => {
         if (!bot) return;
 
         const user = interaction.options.getUser('user');
