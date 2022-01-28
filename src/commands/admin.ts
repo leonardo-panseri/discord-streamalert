@@ -38,9 +38,9 @@ export const addStreamer: Command = {
     data: new SlashCommandBuilder()
         .setName('addstreamer')
         .setDescription('Adds a new streamer')
-        .addUserOption(option => option.setName('user').setDescription('The Discord user'))
-        .addStringOption(option => option.setName('twitch_login').setDescription('The login of the streamer on twitch'))
-        .addRoleOption(option => option.setName('role').setDescription('The role to grant to the streamer while he is streaming')) as SlashCommandBuilder,
+        .addUserOption(option => option.setName('user').setDescription('The Discord user').setRequired(true))
+        .addStringOption(option => option.setName('twitch_login').setDescription('The login of the streamer on twitch').setRequired(true))
+        .addRoleOption(option => option.setName('role').setDescription('The role to grant to the streamer while he is streaming').setRequired(true)) as SlashCommandBuilder,
     execute: async (bot, interaction) => {
         if (!bot) return;
 
@@ -64,7 +64,7 @@ export const removeStreamer: Command = {
     data: new SlashCommandBuilder()
         .setName('removestreamer')
         .setDescription('Removes a registered streamer')
-        .addUserOption(option => option.setName('user').setDescription('The Discord user to remove')) as SlashCommandBuilder,
+        .addUserOption(option => option.setName('user').setDescription('The Discord user to remove').setRequired(true)) as SlashCommandBuilder,
     execute: async (bot, interaction) => {
         if (!bot) return;
 
