@@ -4,9 +4,9 @@ export default createLogger({
     level: process.env.DEBUG ? 'debug' : 'info',
     format: format.printf(options => {
         if (options.moduleName) {
-            return `[${options.moduleName}] ${options.level}: ${options.message}$`;
+            return `[${options.moduleName}] ${options.level}: ${options.message}`;
         } else {
-            return `[Main] ${options.level}: ${options.message}$`;
+            return `[Main] ${options.level}: ${options.message}`;
         }
     }),
     transports: [

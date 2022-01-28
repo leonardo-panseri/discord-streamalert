@@ -50,15 +50,15 @@ export class Webhooks {
         }));
 
         this._app.post('/online', (req, res) => {
-            this.handleRequest(req, res, this.streamOnlineHandler);
+            this.handleRequest(req, res, Webhooks.streamOnlineHandler);
         });
 
         this._app.post('/offline', (req, res) => {
-            this.handleRequest(req, res, this.streamOfflineHandler);
+            this.handleRequest(req, res, Webhooks.streamOfflineHandler);
         });
 
         this._app.post('/update', (req, res) => {
-            this.handleRequest(req, res, this.channelUpdateHandler);
+            this.handleRequest(req, res, Webhooks.channelUpdateHandler);
         });
 
         this._app.listen(this._port, this._onReady);
@@ -96,6 +96,11 @@ export class Webhooks {
         const message = Webhooks.getHmacMessage(req);
         const hmac = Webhooks.HMAC_PREFIX + this.getHmac(message);
         const receivedHmac: string = req.headers[Webhooks.TWITCH_MESSAGE_SIGNATURE] as string;
+        if (!hmac || !receivedHmac) {
+            logger.warn('HMAC not present in request');
+            res.sendStatus(403);
+            return false;
+        }
 
         const valid = timingSafeEqual(Buffer.from(hmac), Buffer.from(receivedHmac));
         if (valid) {
@@ -145,44 +150,47 @@ export class Webhooks {
      * @param handler the function that will handle this request's notification
      * @private
      */
-    private handleRequest(req: Request, res: Response, handler: (notification: Notification) => void): void {
+    private handleRequest(req: Request, res: Response, handler: (streamManager: StreamManager, notification: Notification) => void): void {
         if (!this.verifyRequestHmac(req, res)) return;
         if (!Webhooks.isNotification(req, res)) return;
         const payload = JSON.parse(req.body);
         const broadcasterId = payload['event']['broadcaster_user_id'];
         const broadcasterLogin = payload['event']['broadcaster_user_login'];
-        handler({ 'payload': payload, 'broadcasterId': broadcasterId, 'broadcasterLogin': broadcasterLogin });
+        handler(this._streamManager, { 'payload': payload, 'broadcasterId': broadcasterId, 'broadcasterLogin': broadcasterLogin });
     }
 
     /**
      * Handles the stream.online notification.
+     * @param streamManager the instance of the manager that will handle this notification
      * @param notification the notification that has been received
      * @private
      */
-    private streamOnlineHandler(notification: Notification): void {
+    private static streamOnlineHandler(streamManager: StreamManager, notification: Notification): void {
         const broadcasterName = (notification.payload['event'] as JsonPayload)['broadcaster_user_name'] as string;
-        this._streamManager.onStreamOnline(notification.broadcasterId, notification.broadcasterLogin, broadcasterName)
+        streamManager.onStreamOnline(notification.broadcasterId, notification.broadcasterLogin, broadcasterName)
             .then(() => logger.debug('Finished handling of stream.online notification'));
     }
 
     /**
      * Handles the stream.offline notification.
+     * @param streamManager the instance of the manager that will handle this notification
      * @param notification the notification that has been received
      * @private
      */
-    private streamOfflineHandler(notification: Notification): void {
-        this._streamManager.onStreamOffline(notification.broadcasterId, notification.broadcasterLogin)
+    private static streamOfflineHandler(streamManager: StreamManager, notification: Notification): void {
+        streamManager.onStreamOffline(notification.broadcasterId, notification.broadcasterLogin)
             .then(() => logger.debug('Finished handling of stream.offline notification'));
     }
 
     /**
      * Handles the channel.update notification.
+     * @param streamManager the instance of the manager that will handle this notification
      * @param notification the notification that has been received
      * @private
      */
-    private channelUpdateHandler(notification: Notification): void {
+    private static channelUpdateHandler(streamManager: StreamManager, notification: Notification): void {
         const category = (notification.payload['event'] as JsonPayload)['category_name'] as string;
-        this._streamManager.onChannelUpdate(notification.broadcasterId, notification.broadcasterLogin, category)
+        streamManager.onChannelUpdate(notification.broadcasterId, notification.broadcasterLogin, category)
             .then(() => logger.debug('Finished handling of channel.update notification'));
     }
 }
