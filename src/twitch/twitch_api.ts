@@ -282,7 +282,7 @@ export class TwitchApi {
 
     /**
      * Subscribes to receive notification for stream updates for the given user.
-     * @param broadcasterUsername
+     * @param broadcasterUsername login of the broadcaster
      */
     async subscribeToStreamUpdates(broadcasterUsername: string): Promise<void> {
         const broadcasterID = await this.getUserID(broadcasterUsername);
@@ -293,9 +293,23 @@ export class TwitchApi {
         }
     }
 
+    /**
+     * Deletes all subscriptions to notifications for the given user
+     * @param broadcasterUsername login of the broadcaster
+     */
     async deleteSubscriptions(broadcasterUsername: string) {
-        console.log('delete ' + broadcasterUsername);
-        // TODO implement
+        const broadcasterID = await this.getUserID(broadcasterUsername);
+        if (!broadcasterID) return;
+        const cachedSubscriptions = await this._cache.get(broadcasterID);
+        if (cachedSubscriptions !== undefined) {
+            for (const type of ['stream.online', 'stream.offline', 'channel.update']) {
+                if (cachedSubscriptions[type] !== undefined) {
+                    const subID = cachedSubscriptions[type]['id'];
+                    await this.deleteSubscription(subID);
+                }
+            }
+            await this._cache.delete(broadcasterID);
+        }
     }
 
     /**

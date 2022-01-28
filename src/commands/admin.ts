@@ -20,7 +20,7 @@ export const listStreamers: Command = {
         for (const id in subs) {
             const name = subs[id].name;
             let valid = true;
-            for (const type in ['stream.online', 'stream.offline', 'channel.update']) {
+            for (const type of ['stream.online', 'stream.offline', 'channel.update']) {
                 const sect = subs[id][type];
                 if (typeof sect !== 'string') {
                     const status = sect.status;
@@ -53,7 +53,10 @@ export const addStreamer: Command = {
                 role_id: role.id,
             });
             interaction.reply({ content: 'Done!', ephemeral: true });
-        }).catch(logger.error);
+        }).catch((e) => {
+            logger.error(e);
+            interaction.reply({ content: 'An error has occurred', ephemeral: true });
+        });
     },
 };
 
@@ -82,6 +85,9 @@ export const removeStreamer: Command = {
             if (!login) return;
             bot?.cfg.remove(['streams', login]);
             interaction.reply({ content: 'Done!', ephemeral: true });
-        }).catch(logger.error);
+        }).catch((e) => {
+            logger.error(e);
+            interaction.reply({ content: 'An error has occurred', ephemeral: true });
+        });
     },
 };
