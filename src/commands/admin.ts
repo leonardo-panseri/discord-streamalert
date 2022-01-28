@@ -75,7 +75,7 @@ export const removeStreamer: Command = {
         const streams = bot.cfg.getSection('streams');
         for (const key of streams) {
             if (!key) continue;
-            if (streams.getStringIn([key, 'discord_user_id']) === user.id) {
+            if (streams.getStringIn(['streams', key, 'discord_user_id']) === user.id) {
                 login = key;
             }
         }
