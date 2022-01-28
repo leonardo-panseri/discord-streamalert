@@ -38,9 +38,11 @@ client.once('ready', async () => {
 
     const webhooks = new Webhooks(streamManager, cfg.getNumber('webhooks_port'), cfg.getString('webhooks_secret'), () => {
         logger.info(`Started Webhooks webserver at '${cfg.getString('webhooks_host')}'`);
-        for (const login in cfg.getSection('streams')) {
-            twitchApi.subscribeToStreamUpdates(login)
-                .then(() => logger.info('Finished subscribing process'));
+        for (const login of cfg.getSection('streams')) {
+            if (login) {
+                twitchApi.subscribeToStreamUpdates(login)
+                    .then(() => logger.info('Finished subscribing process'));
+            }
         }
     });
     webhooks.startWebserver();

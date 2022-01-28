@@ -91,4 +91,20 @@ export class Config {
         this._doc.addIn(path, value);
         writeFileSync(Config.CONFIG_FILE, this._doc.toString(), 'utf8');
     }
+
+    [Symbol.iterator]() {
+        const keys = Object.keys(this._root);
+        let i = 0;
+        return {
+            next() {
+                if (i < keys.length) {
+                    const current = keys[i];
+                    i++;
+                    return { value: current, done: false };
+                } else {
+                    return { done: true };
+                }
+            },
+        };
+    }
 }
