@@ -15,10 +15,13 @@ export const listStreamers: Command = {
         const subs = await bot.twitchApi?.getAllSubscriptions(true, true);
         if (!subs) return;
 
+        logger.debug(subs);
+
         const embed = new MessageEmbed().setColor('GREEN');
         let description = '';
         for (const id in subs) {
             const name = subs[id].name;
+            if (!name) return;
             let valid = true;
             for (const type of ['stream.online', 'stream.offline', 'channel.update']) {
                 const sect = subs[id][type];
