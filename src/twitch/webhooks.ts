@@ -1,5 +1,6 @@
 import { getLogger } from '../index.js';
 import { StreamManager } from '../stream_manager.js';
+import { JsonPayload } from '../helper.js';
 import express, { Express, Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 
@@ -7,7 +8,7 @@ const logger = getLogger('Webhooks');
 
 /** Represents a Twitch EventSub notification */
 interface Notification {
-    'payload': object,
+    'payload': JsonPayload,
     'broadcasterId': string,
     'broadcasterLogin': string
 }
@@ -31,7 +32,7 @@ export class Webhooks {
     /** Function to call when the webserver has finished loading */
     private readonly _onReady: () => void;
 
-    private _app: Express;
+    private _app?: Express;
 
     constructor(streamManager: StreamManager, port: number, secret: string, onReady: () => void) {
         this._streamManager = streamManager;
@@ -159,7 +160,7 @@ export class Webhooks {
      * @private
      */
     private streamOnlineHandler(notification: Notification): void {
-        const broadcasterName = notification.payload['event']['broadcaster_user_name'];
+        const broadcasterName = (notification.payload['event'] as JsonPayload)['broadcaster_user_name'] as string;
         this._streamManager.onStreamOnline(notification.broadcasterId, notification.broadcasterLogin, broadcasterName)
             .then(() => logger.debug('Finished handling of stream.online notification'));
     }
@@ -180,7 +181,7 @@ export class Webhooks {
      * @private
      */
     private channelUpdateHandler(notification: Notification): void {
-        const category = notification.payload['event']['category_name'];
+        const category = (notification.payload['event'] as JsonPayload)['category_name'] as string;
         this._streamManager.onChannelUpdate(notification.broadcasterId, notification.broadcasterLogin, category)
             .then(() => logger.debug('Finished handling of channel.update notification'));
     }

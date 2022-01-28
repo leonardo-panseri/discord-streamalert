@@ -1,15 +1,20 @@
 import { getLogger, dataFilePath } from '../index.js';
 import fetch, { RequestInit } from 'node-fetch';
 import Keyv from 'keyv';
+import { JsonPayload } from '../helper.js';
 
 const logger = getLogger('TwitchAPI');
+
+interface Subscriptions {
+    [broadcasterID: string]: { [type: string]: { 'id': string, 'status': string } }
+}
 
 /** Payload to send to subscribe to an event of the EventSub endpoint */
 class EventSubPayload {
     type: string;
     readonly version = '1';
-    condition = {};
-    transport = {
+    condition: JsonPayload = {};
+    transport: JsonPayload = {
         'method': 'webhook' };
 
     constructor(type: string, broadcasterID: string, callbackUrl: string, callbackSecret: string) {
@@ -23,7 +28,7 @@ class EventSubPayload {
 /** Represents an error that has occurred while interacting with the API */
 class TwitchApiError extends Error {
     payload;
-    constructor(message: string, payload) {
+    constructor(message: string, payload: JsonPayload) {
         super(message);
         this.payload = payload;
     }
@@ -51,7 +56,7 @@ export class TwitchApi {
 
     private _cache: Keyv;
 
-    constructor(clientId, clientSecret, callbackBaseUrl, callbackSecret) {
+    constructor(clientId: string, clientSecret: string, callbackBaseUrl: string, callbackSecret: string) {
         this._clientId = clientId;
         this._clientSecret = clientSecret;
         this._callbackBaseUrl = callbackBaseUrl;
@@ -100,8 +105,8 @@ export class TwitchApi {
      * @param validate if the app token should be validated if it is present in cache (default: false)
      * @private
      */
-    private async getAppToken(validate = false): Promise<string> {
-        const cachedToken: string = await this._cache.get('appToken');
+    private async getAppToken(validate = false): Promise<string | undefined> {
+        const cachedToken: string | undefined = await this._cache.get('appToken');
         if (cachedToken) {
             if (validate) {
                 const valid = await this.validateAppToken();
@@ -120,10 +125,11 @@ export class TwitchApi {
         const res = await this.makeApiCall(TwitchApi.getUrlWithParams(TwitchApi.urls.TOKEN, params), {
             method: 'post',
         });
+        if (!res) return undefined;
 
         const token = res['access_token'];
         await this._cache.set('appToken', token);
-        return token;
+        return token as string;
     }
 
     /**
@@ -131,16 +137,19 @@ export class TwitchApi {
      * @param username the username of the user
      * @private
      */
-    private async getUserID(username: string): Promise<string> {
+    private async getUserID(username: string): Promise<string | undefined> {
         const url = TwitchApi.getUrlWithParams(TwitchApi.urls.USERS, { 'login': username });
         const res = await this.makeApiCall(url, {
             headers: await this.getHeaders(),
         });
-        if (!res['data'][0]) {
+        if (!res) return undefined;
+
+        const data = res['data'] as JsonPayload[];
+        if (!data[0]) {
             logger.warn(`No user with username ${username}`);
             return undefined;
         }
-        return res['data'][0]['id'];
+        return data[0]['id'] as string;
     }
 
     /**
@@ -149,24 +158,26 @@ export class TwitchApi {
      * @param subscriptionID the id of the subscription
      * @private
      */
-    private async getSubscriptionStatus(type: string, subscriptionID: string): Promise<string> {
-        let paginationCursor = undefined;
+    private async getSubscriptionStatus(type: string, subscriptionID: string): Promise<string | undefined> {
+        let paginationCursor: string | undefined = undefined;
         do {
-            const params = paginationCursor === undefined ? { 'type': type } : { 'type': type, 'after': paginationCursor };
+            const params: Record<string, string> = paginationCursor === undefined ?
+                { 'type': type } : { 'type': type, 'after': paginationCursor };
             const url = TwitchApi.getUrlWithParams(TwitchApi.urls.EVENTSUB, params);
 
             const res = await this.makeApiCall(url, {
                 headers: await this.getHeaders(),
             });
+            if (!res) return undefined;
 
-            const data = res['data'];
+            const data = res['data'] as JsonPayload[];
             for (const sub of data) {
                 if (sub['id'] === subscriptionID) {
-                    return sub['status'];
+                    return sub['status'] as string;
                 }
             }
 
-            paginationCursor = res['pagination']['cursor'];
+            paginationCursor = (res['pagination'] as JsonPayload)['cursor'] as string | undefined;
             if (paginationCursor === '') paginationCursor = undefined;
         } while (paginationCursor !== undefined);
 
@@ -225,8 +236,11 @@ export class TwitchApi {
                 headers: await this.getHeaders({ json: true }),
                 body: JSON.stringify(payload),
             }, [ 409 ]);
-            const id = res['data'][0]['id'];
-            const status = res['data'][0]['status'];
+            if (!res) return;
+
+            const data = (res['data'] as JsonPayload[])[0];
+            const id = data['id'];
+            const status = data['status'];
             cachedSubscriptions[type] = {
                 'id': id,
                 'status': status,
@@ -261,28 +275,31 @@ export class TwitchApi {
      * Gets all subscriptions made to the EventSub endpoint
      * @param updateCache if the result should be used to update cache (default: false)
      */
-    async getAllSubscriptions(updateCache = false) {
-        const result = {};
-        let paginationCursor = undefined;
+    async getAllSubscriptions(updateCache = false): Promise<Subscriptions | undefined> {
+        const result: Subscriptions = {};
+        let paginationCursor: string | undefined = undefined;
         do {
-            const params = { 'after': paginationCursor };
-            const url = paginationCursor === undefined ?
-                TwitchApi.urls.EVENTSUB :
-                TwitchApi.getUrlWithParams(TwitchApi.urls.EVENTSUB, params);
+            let url: string;
+            if (paginationCursor === undefined) {
+                url = TwitchApi.urls.EVENTSUB;
+            } else {
+                const params = { 'after': paginationCursor };
+                url = TwitchApi.getUrlWithParams(TwitchApi.urls.EVENTSUB, params);
+            }
 
             const res = await this.makeApiCall(url, {
                 headers: await this.getHeaders(),
             });
+            if (!res) return undefined;
 
-            const data = res['data'];
+            const data = res['data'] as JsonPayload[];
             for (const sub of data) {
-                const broadcasterId = sub['condition']['broadcaster_user_id'];
-                const type = sub['type'];
-                const id = sub['id'];
-                const status = sub['status'];
+                const broadcasterId = (sub['condition'] as JsonPayload)['broadcaster_user_id'] as string;
+                const type = sub['type'] as string;
+                const id = sub['id'] as string;
+                const status = sub['status'] as string;
 
                 if (result[broadcasterId] === undefined) result[broadcasterId] = {};
-                if (result[broadcasterId][type] === undefined) result[broadcasterId][type] = {};
 
                 result[broadcasterId][type] = {
                     'id': id,
@@ -290,7 +307,7 @@ export class TwitchApi {
                 };
             }
 
-            paginationCursor = res['pagination']['cursor'];
+            paginationCursor = (res['pagination'] as JsonPayload)['cursor'] as string | undefined;
             if (paginationCursor === '') paginationCursor = undefined;
         } while (paginationCursor !== undefined);
 
@@ -308,11 +325,11 @@ export class TwitchApi {
      * Gets stream info for the given broadcaster's stream.
      * @param broadcasterId the id of the broadcaster
      */
-    async getStreamInfo(broadcasterId: string) {
+    async getStreamInfo(broadcasterId: string): Promise<JsonPayload | undefined> {
         const url = TwitchApi.getUrlWithParams(TwitchApi.urls.STREAMS, { 'user_id': broadcasterId });
         const res = await this.makeApiCall(url, { headers: await this.getHeaders() });
         if (res) {
-            const info = res['data'][0];
+            const info = (res['data'] as JsonPayload)[0] as JsonPayload;
             if (!info) {
                 logger.error(`Invalid broadcasterID '${broadcasterId}'`);
                 return undefined;
@@ -328,7 +345,7 @@ export class TwitchApi {
      * @param errorStatusCodes optional list of status codes that will throw errors to the caller
      * @private
      */
-    private async makeApiCall(url: string, options: RequestInit, errorStatusCodes: number[] = []): Promise<object> {
+    private async makeApiCall(url: string, options: RequestInit, errorStatusCodes: number[] = []): Promise<JsonPayload | undefined> {
         logger.debug(`Making API call to: ${url} with options: ${JSON.stringify(options, null, 2)}`);
         let attemptLeft = 2;
         do {

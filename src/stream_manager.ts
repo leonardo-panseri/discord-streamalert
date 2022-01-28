@@ -1,7 +1,7 @@
 import { getLogger, cfg, dataFilePath } from './index.js';
-import { format } from './helper.js';
+import { format, JsonPayload } from './helper.js';
 import { TwitchApi } from './twitch/twitch_api.js';
-import { Client, GuildMember, MessageEmbed, Snowflake, TextChannel } from 'discord.js';
+import { Client, ColorResolvable, GuildMember, MessageEmbed, Snowflake, TextChannel } from 'discord.js';
 import Keyv from 'keyv';
 import Database from 'better-sqlite3';
 
@@ -10,7 +10,7 @@ const logger = getLogger('StreamManager');
 interface StreamEvent {
     broadcasterName: string;
     category: string;
-    messageId: Snowflake;
+    messageId?: Snowflake;
 }
 
 export class StreamManager {
@@ -36,16 +36,16 @@ export class StreamManager {
      * Fetches the channel where to send alerts from the id specified in the config, if an error occurs returns undefined.
      * @private
      */
-    private async fetchNotificationChannel(): Promise<TextChannel> {
+    private async fetchNotificationChannel(): Promise<TextChannel | undefined> {
         try {
-            const channel = await this._client.channels.fetch(cfg['notification_channel']);
+            const channel = await this._client.channels.fetch(cfg.getString('notification_channel'));
             if (!channel || !(channel instanceof TextChannel)) {
                 logger.error('Invalid id for "notification_channel", check config');
                 return undefined;
             }
             return channel;
         } catch (e) {
-            logger.error(`Error while retrieving notification channel: ${e.message}`);
+            logger.error(`Error while retrieving notification channel: ${e}`);
             return undefined;
         }
     }
@@ -59,10 +59,11 @@ export class StreamManager {
      * @private
      */
     private static createStreamEmbed(broadcasterLogin: string, broadcasterName: string, title: string, thumbnailUrl: string): MessageEmbed {
+        const sect = cfg.getSection('embed');
         return new MessageEmbed()
-            .setColor(cfg['embed']['color'])
-            .setTitle(format(cfg['embed']['title'], { 'name': broadcasterName }))
-            .setDescription(format(cfg['embed']['description'], { 'streamTitle': title }))
+            .setColor(sect.getString('color') as ColorResolvable)
+            .setTitle(format(sect.getString('title'), { 'name': broadcasterName }))
+            .setDescription(format(sect.getString('description'), { 'streamTitle': title }))
             .setURL(`https://www.twitch.tv/${broadcasterLogin}`)
             .setImage(thumbnailUrl)
             .setTimestamp();
@@ -73,13 +74,16 @@ export class StreamManager {
      * @param streamInfo
      * @private
      */
-    private async sendStreamEmbed(streamInfo): Promise<string> {
-        const broadcasterLogin = streamInfo['user_login'];
-        const broadcasterName = streamInfo['user_name'];
-        const title = streamInfo['title'];
-        const thumbnailUrl = streamInfo['thumbnail_url'].replace('{width}', '440').replace('{height}', '248');
+    private async sendStreamEmbed(streamInfo: JsonPayload): Promise<string | undefined> {
+        const broadcasterLogin = streamInfo['user_login'] as string;
+        const broadcasterName = streamInfo['user_name'] as string;
+        const title = streamInfo['title'] as string;
+        const thumbnailUrl = (streamInfo['thumbnail_url'] as string)
+            .replace('{width}', '440')
+            .replace('{height}', '248');
         const embed = StreamManager.createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUrl);
         const channel = await this.fetchNotificationChannel();
+        if (!channel) return undefined;
         const msg = await channel.send({ embeds: [embed] });
         await this._cache.set(msg.id, broadcasterLogin);
         return msg.id;
@@ -92,12 +96,14 @@ export class StreamManager {
      * @param save if the deletion should be saved to cache (default: true)
      * @private
      */
-    private async deleteMessage(broadcasterId, messageId, save = true): Promise<void> {
+    private async deleteMessage(messageId: string, broadcasterId?: string, save = true): Promise<void> {
         const channel = await this.fetchNotificationChannel();
-        try {
-            await channel.messages.delete(messageId);
-        } catch (e) {
-            logger.debug('Trying to delete a message that does not exists');
+        if (channel) {
+            try {
+                await channel.messages.delete(messageId);
+            } catch (e) {
+                logger.debug('Trying to delete a message that does not exists');
+            }
         }
         if (save) {
             if (broadcasterId && this._onlineStreams[broadcasterId]) this._onlineStreams[broadcasterId].messageId = undefined;
@@ -112,10 +118,12 @@ export class StreamManager {
      */
     private async fetchDiscordUser(broadcasterLogin: string): Promise<GuildMember | undefined> {
         try {
-            return await this._client.guilds.cache.first()
-                .members.fetch(cfg['streams'][broadcasterLogin]['discord_user_id']);
+            const guild = this._client.guilds.cache.first();
+            if (!guild) return undefined;
+            return await guild.members.fetch(
+                cfg.getStringIn(['streams', broadcasterLogin, 'discord_user_id']));
         } catch (e) {
-            logger.error(e);
+            logger.error(`Error while fetching user: ${e}`);
         }
         return undefined;
     }
@@ -128,7 +136,7 @@ export class StreamManager {
     private async grantStreamerRole(broadcasterLogin: string) {
         const member = await this.fetchDiscordUser(broadcasterLogin);
         if (!member) return;
-        member.roles.add(cfg['streams'][broadcasterLogin]['role_id'])
+        member.roles.add(cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
             .catch(logger.error);
     }
 
@@ -140,7 +148,7 @@ export class StreamManager {
     private async removeStreamerRole(broadcasterLogin: string) {
         const member = await this.fetchDiscordUser(broadcasterLogin);
         if (!member) return;
-        member.roles.remove(cfg['streams'][broadcasterLogin]['role_id'])
+        member.roles.remove(cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
             .catch(logger.error);
     }
 
@@ -153,7 +161,7 @@ export class StreamManager {
         const rows = db.prepare('SELECT \'key\',\'value\' from keyv WHERE \'key\' LIKE \'streamManager:%\'').all();
         logger.debug(JSON.stringify(rows));
         rows.forEach(row => {
-            this.deleteMessage(undefined, row.key, false);
+            this.deleteMessage(row.key, undefined, false);
             const login = JSON.parse(row.value)['value'];
             this.removeStreamerRole(login);
         });
@@ -174,21 +182,21 @@ export class StreamManager {
             logger.warn(`Received online notification for ${broadcasterName} stream that was already cached as online`);
             const msgID = this._onlineStreams[broadcasterId].messageId;
             if (msgID !== undefined) {
-                await this.deleteMessage(broadcasterId, msgID);
+                await this.deleteMessage(msgID, broadcasterId);
             }
             delete this._onlineStreams[broadcasterId];
         }
 
         const streamInfo = await this._twitchApi.getStreamInfo(broadcasterId);
         if (!streamInfo) return;
-        const category = streamInfo['game_name'];
+        const category = streamInfo['game_name'] as string;
 
         const stream: StreamEvent = {
             'broadcasterName': broadcasterName,
             'category': category,
             'messageId': undefined };
 
-        if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
+        if (category.toLowerCase() === cfg.getString('stream_category').toLowerCase()) {
             stream.messageId = await this.sendStreamEmbed(streamInfo);
             this.grantStreamerRole(broadcasterLogin).then();
         }
@@ -207,7 +215,7 @@ export class StreamManager {
         if (this._onlineStreams[broadcasterId] !== undefined) {
             const msgID = this._onlineStreams[broadcasterId].messageId;
             if (msgID !== undefined) {
-                await this.deleteMessage(broadcasterId, msgID);
+                await this.deleteMessage(msgID, broadcasterId);
             }
             this.removeStreamerRole(broadcasterLogin).then();
             delete this._onlineStreams[broadcasterId];
@@ -227,11 +235,11 @@ export class StreamManager {
         if (this._onlineStreams[broadcasterId] !== undefined) {
             const msgID = this._onlineStreams[broadcasterId].messageId;
             if (msgID !== undefined) {
-                if (category.toLowerCase() !== cfg['stream_category'].toLowerCase()) {
-                    await this.deleteMessage(broadcasterId, msgID);
+                if (category.toLowerCase() !== cfg.getString('stream_category').toLowerCase()) {
+                    await this.deleteMessage(msgID, broadcasterId);
                     this.removeStreamerRole(broadcasterLogin).then();
                 }
-            } else if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
+            } else if (category.toLowerCase() === cfg.getString('stream_category').toLowerCase()) {
                 const streamInfo = await this._twitchApi.getStreamInfo(broadcasterId);
                 if (!streamInfo) return;
                 this._onlineStreams[broadcasterId].messageId = await this.sendStreamEmbed(streamInfo);
