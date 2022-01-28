@@ -1,12 +1,14 @@
-import { getLogger, dataFilePath } from '../index.js';
 import fetch, { RequestInit } from 'node-fetch';
 import Keyv from 'keyv';
 import { JsonPayload } from '../helper.js';
+import log from '../log.js';
 
-const logger = getLogger('TwitchAPI');
+const logger = log('TwitchAPI');
 
 interface Subscriptions {
-    [broadcasterID: string]: { [type: string]: { 'id': string, 'status': string } }
+    [broadcasterID: string]: {
+        [type: string]: { id: string, status: string } | string
+    }
 }
 
 /** Payload to send to subscribe to an event of the EventSub endpoint */
@@ -56,7 +58,7 @@ export class TwitchApi {
 
     private _cache: Keyv;
 
-    constructor(clientId: string, clientSecret: string, callbackBaseUrl: string, callbackSecret: string) {
+    constructor(clientId: string, clientSecret: string, callbackBaseUrl: string, callbackSecret: string, dataFilePath: string) {
         this._clientId = clientId;
         this._clientSecret = clientSecret;
         this._callbackBaseUrl = callbackBaseUrl;
@@ -150,6 +152,26 @@ export class TwitchApi {
             return undefined;
         }
         return data[0]['id'] as string;
+    }
+
+    /**
+     * Gets the name of the user, or undefined if not found
+     * @param userId the user id
+     * @private
+     */
+    private async getUsername(userId: string): Promise<string | undefined> {
+        const url = TwitchApi.getUrlWithParams(TwitchApi.urls.USERS, { 'id': userId });
+        const res = await this.makeApiCall(url, {
+            headers: await this.getHeaders(),
+        });
+        if (!res) return undefined;
+
+        const data = res['data'] as JsonPayload[];
+        if (!data[0]) {
+            logger.warn(`No user with username ${userId}`);
+            return undefined;
+        }
+        return data[0]['display_name'] as string;
     }
 
     /**
@@ -271,11 +293,17 @@ export class TwitchApi {
         }
     }
 
+    async deleteSubscriptions(broadcasterUsername: string) {
+        console.log('delete ' + broadcasterUsername);
+        // TODO implement
+    }
+
     /**
      * Gets all subscriptions made to the EventSub endpoint
      * @param updateCache if the result should be used to update cache (default: false)
+     * @param fetchDisplayNames if the result should contain display names
      */
-    async getAllSubscriptions(updateCache = false): Promise<Subscriptions | undefined> {
+    async getAllSubscriptions(updateCache = false, fetchDisplayNames = false): Promise<Subscriptions | undefined> {
         const result: Subscriptions = {};
         let paginationCursor: string | undefined = undefined;
         do {
@@ -300,6 +328,12 @@ export class TwitchApi {
                 const status = sub['status'] as string;
 
                 if (result[broadcasterId] === undefined) result[broadcasterId] = {};
+
+                if (fetchDisplayNames) {
+                    if (result[broadcasterId].name === undefined) {
+                        result[broadcasterId].name = await this.getUsername(broadcasterId) as string;
+                    }
+                }
 
                 result[broadcasterId][type] = {
                     'id': id,

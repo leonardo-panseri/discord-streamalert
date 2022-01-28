@@ -1,7 +1,12 @@
 # Token for the Discord Bot
 token: YOUR_TOKEN_HERE
 
-# Client ID and secret for the Twitch API
+# Id of the Discord bot
+client_id: "ID"
+# Id of the guild where the Discord bot will operate
+guild_id: "ID"
+
+# Client Id and secret for the Twitch API
 twitch_id_client: YOUR_TWITCH_ID_CLIENT_HERE
 twitch_secret: YOUR_TWITCH_SECRET_HERE
 

@@ -1,11 +1,12 @@
-import { getLogger, cfg, dataFilePath } from './index.js';
+import log from './log.js';
 import { format, JsonPayload } from './helper.js';
 import { TwitchApi } from './twitch/twitch_api.js';
 import { Client, ColorResolvable, GuildMember, MessageEmbed, Snowflake, TextChannel } from 'discord.js';
 import Keyv from 'keyv';
 import Database from 'better-sqlite3';
+import { Config } from './config.js';
 
-const logger = getLogger('StreamManager');
+const logger = log('StreamManager');
 
 interface StreamEvent {
     broadcasterName: string;
@@ -22,12 +23,18 @@ export class StreamManager {
     /** Key/Value store containing all sent alert message ids */
     private readonly _cache: Keyv;
 
-    constructor(client: Client, twitchApi: TwitchApi) {
+    private readonly _dataFilePath;
+    private readonly _cfg: Config;
+
+    constructor(client: Client, twitchApi: TwitchApi, dataFilePath: string, cfg: Config) {
         this._client = client;
         this._twitchApi = twitchApi;
 
         this._onlineStreams = {};
         this._cache = new Keyv('sqlite://' + dataFilePath, { namespace: 'streamManager' });
+
+        this._dataFilePath = dataFilePath;
+        this._cfg = cfg;
 
         this.cleanupMessagesAndRoles().then(() => logger.debug('Finished cleaning up tracked messages'));
     }
@@ -38,7 +45,7 @@ export class StreamManager {
      */
     private async fetchNotificationChannel(): Promise<TextChannel | undefined> {
         try {
-            const channel = await this._client.channels.fetch(cfg.getString('notification_channel'));
+            const channel = await this._client.channels.fetch(this._cfg.getString('notification_channel'));
             if (!channel || !(channel instanceof TextChannel)) {
                 logger.error('Invalid id for "notification_channel", check config');
                 return undefined;
@@ -58,8 +65,8 @@ export class StreamManager {
      * @param thumbnailUrl the url for the thumbnail of the stream
      * @private
      */
-    private static createStreamEmbed(broadcasterLogin: string, broadcasterName: string, title: string, thumbnailUrl: string): MessageEmbed {
-        const sect = cfg.getSection('embed');
+    private createStreamEmbed(broadcasterLogin: string, broadcasterName: string, title: string, thumbnailUrl: string): MessageEmbed {
+        const sect = this._cfg.getSection('embed');
         return new MessageEmbed()
             .setColor(sect.getString('color') as ColorResolvable)
             .setTitle(format(sect.getString('title'), { 'name': broadcasterName }))
@@ -81,7 +88,7 @@ export class StreamManager {
         const thumbnailUrl = (streamInfo['thumbnail_url'] as string)
             .replace('{width}', '440')
             .replace('{height}', '248');
-        const embed = StreamManager.createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUrl);
+        const embed = this.createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUrl);
         const channel = await this.fetchNotificationChannel();
         if (!channel) return undefined;
         const msg = await channel.send({ embeds: [embed] });
@@ -121,7 +128,7 @@ export class StreamManager {
             const guild = this._client.guilds.cache.first();
             if (!guild) return undefined;
             return await guild.members.fetch(
-                cfg.getStringIn(['streams', broadcasterLogin, 'discord_user_id']));
+                this._cfg.getStringIn(['streams', broadcasterLogin, 'discord_user_id']));
         } catch (e) {
             logger.error(`Error while fetching user: ${e}`);
         }
@@ -136,7 +143,7 @@ export class StreamManager {
     private async grantStreamerRole(broadcasterLogin: string) {
         const member = await this.fetchDiscordUser(broadcasterLogin);
         if (!member) return;
-        member.roles.add(cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
+        member.roles.add(this._cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
             .catch(logger.error);
     }
 
@@ -148,7 +155,7 @@ export class StreamManager {
     private async removeStreamerRole(broadcasterLogin: string) {
         const member = await this.fetchDiscordUser(broadcasterLogin);
         if (!member) return;
-        member.roles.remove(cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
+        member.roles.remove(this._cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
             .catch(logger.error);
     }
 
@@ -157,7 +164,7 @@ export class StreamManager {
      * @private
      */
     private async cleanupMessagesAndRoles(): Promise<void> {
-        const db = new Database(dataFilePath);
+        const db = new Database(this._dataFilePath);
         const rows = db.prepare('SELECT \'key\',\'value\' from keyv WHERE \'key\' LIKE \'streamManager:%\'').all();
         logger.debug(JSON.stringify(rows));
         rows.forEach(row => {
@@ -196,7 +203,7 @@ export class StreamManager {
             'category': category,
             'messageId': undefined };
 
-        if (category.toLowerCase() === cfg.getString('stream_category').toLowerCase()) {
+        if (category.toLowerCase() === this._cfg.getString('stream_category').toLowerCase()) {
             stream.messageId = await this.sendStreamEmbed(streamInfo);
             this.grantStreamerRole(broadcasterLogin).then();
         }
@@ -235,11 +242,11 @@ export class StreamManager {
         if (this._onlineStreams[broadcasterId] !== undefined) {
             const msgID = this._onlineStreams[broadcasterId].messageId;
             if (msgID !== undefined) {
-                if (category.toLowerCase() !== cfg.getString('stream_category').toLowerCase()) {
+                if (category.toLowerCase() !== this._cfg.getString('stream_category').toLowerCase()) {
                     await this.deleteMessage(msgID, broadcasterId);
                     this.removeStreamerRole(broadcasterLogin).then();
                 }
-            } else if (category.toLowerCase() === cfg.getString('stream_category').toLowerCase()) {
+            } else if (category.toLowerCase() === this._cfg.getString('stream_category').toLowerCase()) {
                 const streamInfo = await this._twitchApi.getStreamInfo(broadcasterId);
                 if (!streamInfo) return;
                 this._onlineStreams[broadcasterId].messageId = await this.sendStreamEmbed(streamInfo);

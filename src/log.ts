@@ -1,6 +1,6 @@
 import { createLogger, format, transports } from 'winston';
 
-export default createLogger({
+const logger = createLogger({
     level: process.env.DEBUG ? 'debug' : 'info',
     format: format.printf(options => {
         if (options.moduleName) {
@@ -13,3 +13,13 @@ export default createLogger({
         new transports.Console(),
     ],
 });
+
+function getLogger(moduleName?: string) {
+    if (moduleName) {
+        return logger.child({ moduleName: moduleName });
+    } else {
+        return logger;
+    }
+}
+
+export default getLogger;

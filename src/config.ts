@@ -1,9 +1,9 @@
-import { getLogger } from './index.js';
+import log from './log.js';
 import { Document, parse, parseDocument } from 'yaml';
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'fs';
 import { getPathRelativeToProjectRoot } from './helper.js';
 
-const logger = getLogger();
+const logger = log();
 
 interface ConfigSect {
     [key: string]: string | number | boolean | ConfigSect;
@@ -89,6 +89,11 @@ export class Config {
      */
     add(path: string[], value: unknown) {
         this._doc.addIn(path, value);
+        writeFileSync(Config.CONFIG_FILE, this._doc.toString(), 'utf8');
+    }
+
+    remove(path: string[]) {
+        this._doc.deleteIn(path);
         writeFileSync(Config.CONFIG_FILE, this._doc.toString(), 'utf8');
     }
 

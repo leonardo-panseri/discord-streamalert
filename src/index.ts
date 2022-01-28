@@ -1,52 +1,86 @@
-import logger from './log.js';
+import log from './log.js';
 import { Config } from './config.js';
 import { StreamManager } from './stream_manager.js';
 import { TwitchApi } from './twitch/twitch_api.js';
 import { Webhooks } from './twitch/webhooks.js';
-import { Client, Intents } from 'discord.js';
+import { Client, CommandInteraction, Intents } from 'discord.js';
 import { getPathRelativeToProjectRoot } from './helper.js';
 import { existsSync } from 'fs';
+import { CommandManager } from './commands/command_manager.js';
 
-export function getLogger(moduleName?: string) {
-    if (moduleName) {
-        return logger.child({ moduleName: moduleName });
-    } else {
-        return logger;
+const logger = log();
+
+let bot: Bot | undefined = undefined;
+
+class Bot {
+    readonly cfg;
+    private readonly _dataFilePath;
+
+    private readonly _client;
+    private readonly _cmdManager;
+
+    twitchApi?: TwitchApi;
+    streamManager?: StreamManager;
+
+    constructor() {
+        this.cfg = new Config();
+        if (this.cfg === undefined) process.exit(1);
+
+        this._dataFilePath = getPathRelativeToProjectRoot(this.cfg.getString('database_file'));
+        if (!existsSync(this._dataFilePath)) {
+            logger.error('Database file not found, check your configuration');
+            process.exit(1);
+        }
+
+        this._client = new Client({ intents: [Intents.FLAGS.GUILDS] });
+        this._cmdManager = new CommandManager();
+
+        this.registerEventListeners();
+    }
+
+    private registerEventListeners() {
+        this._client.on('interactionCreate', interaction => {
+            if (!interaction.isCommand()) return;
+
+            this._cmdManager.handleCommandInteraction(interaction as CommandInteraction);
+        });
+
+        this._client.once('ready', this.onReady);
+    }
+
+    private async onReady() {
+        const guildsNum = this._client.guilds.cache.size;
+        logger.info(`StreamAlert loaded in ${guildsNum} guild`);
+        if (guildsNum) logger.warn('This bot is meant to be used on a single server only');
+
+        this.twitchApi = new TwitchApi(
+            this.cfg.getString('twitch_id_client'), this.cfg.getString('twitch_secret'),
+            this.cfg.getString('webhooks_host'), this.cfg.getString('webhooks_secret'),
+            this._dataFilePath);
+
+        this.streamManager = new StreamManager(this._client, this.twitchApi, this._dataFilePath, this.cfg);
+
+        const webhooks = new Webhooks(this.streamManager, this.cfg.getNumber('webhooks_port'), this.cfg.getString('webhooks_secret'), () => {
+            logger.info(`Started Webhooks webserver at '${this.cfg.getString('webhooks_host')}'`);
+            for (const login of this.cfg.getSection('streams')) {
+                if (login) {
+                    this.twitchApi?.subscribeToStreamUpdates(login)
+                        .then(() => logger.info('Finished subscribing process'));
+                }
+            }
+        });
+        webhooks.startWebserver();
+    }
+
+    start() {
+        this._client.login(this.cfg.getString('token'))
+            .then(() => logger.debug('Bot has logged in'));
     }
 }
 
-export const cfg = new Config();
-if (cfg === undefined) process.exit(1);
+export default bot;
 
-export const dataFilePath = getPathRelativeToProjectRoot(cfg.getString('database_file'));
-if (!existsSync(dataFilePath)) {
-    logger.error('Database file not found, check your configuration');
-    process.exit(1);
+if (require.main === module) {
+    bot = new Bot();
+    bot.start();
 }
-
-const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
-
-client.once('ready', async () => {
-    logger.info(`StreamAlert loaded in ${client.guilds.cache.size} guild`);
-    if (client.guilds.cache.size > 1) logger.warn('This bot is meant to be used on a single server only');
-
-    const twitchApi = new TwitchApi(
-        cfg.getString('twitch_id_client'), cfg.getString('twitch_secret'),
-        cfg.getString('webhooks_host'), cfg.getString('webhooks_secret'));
-
-    const streamManager = new StreamManager(client, twitchApi);
-
-    const webhooks = new Webhooks(streamManager, cfg.getNumber('webhooks_port'), cfg.getString('webhooks_secret'), () => {
-        logger.info(`Started Webhooks webserver at '${cfg.getString('webhooks_host')}'`);
-        for (const login of cfg.getSection('streams')) {
-            if (login) {
-                twitchApi.subscribeToStreamUpdates(login)
-                    .then(() => logger.info('Finished subscribing process'));
-            }
-        }
-    });
-    webhooks.startWebserver();
-});
-
-client.login(cfg.getString('token'))
-    .then(() => logger.debug('Bot has logged in'));

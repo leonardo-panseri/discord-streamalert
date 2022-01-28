@@ -1,10 +1,10 @@
-import { getLogger } from '../index.js';
+import log from '../log.js';
 import { StreamManager } from '../stream_manager.js';
 import { JsonPayload } from '../helper.js';
 import express, { Express, Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 
-const logger = getLogger('Webhooks');
+const logger = log('Webhooks');
 
 /** Represents a Twitch EventSub notification */
 interface Notification {
