@@ -7,6 +7,7 @@ import { Client, CommandInteraction, Intents } from 'discord.js';
 import { getPathRelativeToProjectRoot } from './helper.js';
 import { existsSync } from 'fs';
 import { CommandManager } from './commands/command_manager.js';
+import * as url from 'url';
 
 const logger = log();
 
@@ -80,7 +81,7 @@ class Bot {
 
 export default bot;
 
-if (require.main === module) {
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     bot = new Bot();
     bot.start();
 }
