@@ -29,7 +29,7 @@ export class StreamManager {
         this._onlineStreams = {};
         this._cache = new Keyv('sqlite://' + dataFilePath, { namespace: 'streamManager' });
 
-        this.cleanupTrackedMessages().then(() => logger.debug('Finished cleaning up tracked messages'));
+        this.cleanupMessagesAndRoles().then(() => logger.debug('Finished cleaning up tracked messages'));
     }
 
     /**
@@ -133,7 +133,7 @@ export class StreamManager {
     }
 
     /**
-     * Removes the streamer role in the discord guild grom the broadcaster.
+     * Removes the streamer role in the discord guild from the broadcaster.
      * @param broadcasterLogin the login of the broadcaster
      * @private
      */
@@ -145,15 +145,17 @@ export class StreamManager {
     }
 
     /**
-     * Deletes all messages which id is present in cache.
+     * Deletes all messages which id is present in cache and removes the roles from the discord guild member.
      * @private
      */
-    private async cleanupTrackedMessages(): Promise<void> {
+    private async cleanupMessagesAndRoles(): Promise<void> {
         const db = new Database(dataFilePath);
-        const query = db.prepare('SELECT \'key\' from keyv WHERE \'key\' LIKE \'streamManager:%\'').pluck().all();
-        logger.debug(JSON.stringify(query));
-        query.forEach(id => {
-            this.deleteMessage(undefined, id, false);
+        const rows = db.prepare('SELECT \'key\',\'value\' from keyv WHERE \'key\' LIKE \'streamManager:%\'').all();
+        logger.debug(JSON.stringify(rows));
+        rows.forEach(row => {
+            this.deleteMessage(undefined, row.key, false);
+            const login = JSON.parse(row.value)['value'];
+            this.removeStreamerRole(login);
         });
         await this._cache.clear();
     }
