@@ -39,13 +39,13 @@ export const addStreamer: Command = {
         .setName('addstreamer')
         .setDescription('Adds a new streamer')
         .addUserOption(option => option.setName('user').setDescription('The Discord user'))
-        .addStringOption(option => option.setName('twitchLogin').setDescription('The login of the streamer on twitch'))
+        .addStringOption(option => option.setName('twitch_login').setDescription('The login of the streamer on twitch'))
         .addRoleOption(option => option.setName('role').setDescription('The role to grant to the streamer while he is streaming')) as SlashCommandBuilder,
     execute: async (interaction) => {
         if (!bot) return;
 
         const user = interaction.options.getUser('user') as User;
-        const login = interaction.options.getString('twitchLogin') as string;
+        const login = interaction.options.getString('twitch_login') as string;
         const role = interaction.options.getRole('role') as Role;
         bot.twitchApi?.subscribeToStreamUpdates(login).then(() => {
             bot?.cfg.add(['streams', login], {
