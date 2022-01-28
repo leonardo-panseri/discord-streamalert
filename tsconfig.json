@@ -1,6 +1,7 @@
 {
   "include": ["src/**/*"],
   "compilerOptions": {
+    "strict": false,
     "module": "ES2020",
     "target": "ES2020",
     "moduleResolution": "Node",

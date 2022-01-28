@@ -1,7 +1,7 @@
 import { getLogger, cfg, dataFilePath } from './index.js';
 import { format } from './helper.js';
 import { TwitchApi } from './twitch/twitch_api.js';
-import { Client, MessageEmbed, Snowflake, TextChannel } from 'discord.js';
+import { Client, GuildMember, MessageEmbed, Snowflake, TextChannel } from 'discord.js';
 import Keyv from 'keyv';
 import Database from 'better-sqlite3';
 
@@ -81,7 +81,7 @@ export class StreamManager {
         const embed = StreamManager.createStreamEmbed(broadcasterLogin, broadcasterName, title, thumbnailUrl);
         const channel = await this.fetchNotificationChannel();
         const msg = await channel.send({ embeds: [embed] });
-        await this._cache.set(msg.id, 1);
+        await this._cache.set(msg.id, broadcasterLogin);
         return msg.id;
     }
 
@@ -106,6 +106,45 @@ export class StreamManager {
     }
 
     /**
+     * Fetches the guild member with the id specified in the config for this broadcasterLogin.
+     * @param broadcasterLogin the login of the broadcaster
+     * @private
+     */
+    private async fetchDiscordUser(broadcasterLogin: string): Promise<GuildMember | undefined> {
+        try {
+            return await this._client.guilds.cache.first()
+                .members.fetch(cfg['streams'][broadcasterLogin]['discord_user_id']);
+        } catch (e) {
+            logger.error(e);
+        }
+        return undefined;
+    }
+
+    /**
+     * Grants the streamer role in the discord guild to the broadcaster.
+     * @param broadcasterLogin the login of the broadcaster
+     * @private
+     */
+    private async grantStreamerRole(broadcasterLogin: string) {
+        const member = await this.fetchDiscordUser(broadcasterLogin);
+        if (!member) return;
+        member.roles.add(cfg['streams'][broadcasterLogin]['role_id'])
+            .catch(logger.error);
+    }
+
+    /**
+     * Removes the streamer role in the discord guild grom the broadcaster.
+     * @param broadcasterLogin the login of the broadcaster
+     * @private
+     */
+    private async removeStreamerRole(broadcasterLogin: string) {
+        const member = await this.fetchDiscordUser(broadcasterLogin);
+        if (!member) return;
+        member.roles.remove(cfg['streams'][broadcasterLogin]['role_id'])
+            .catch(logger.error);
+    }
+
+    /**
      * Deletes all messages which id is present in cache.
      * @private
      */
@@ -123,9 +162,10 @@ export class StreamManager {
      * Handles a stream.online notification, sending an alert in the channel specified in the config if the stream
      * is in the category specified in the config.
      * @param broadcasterId the id of the broadcaster that started streaming
-     * @param broadcasterName the name of the broadcaster that started streaming
+     * @param broadcasterLogin the login of the broadcaster that started streaming
+     * @param broadcasterName the display name of the broadcaster that started streaming
      */
-    async onStreamOnline(broadcasterId: string, broadcasterName: string): Promise<void> {
+    async onStreamOnline(broadcasterId: string, broadcasterLogin: string, broadcasterName: string): Promise<void> {
         logger.debug(`Stream online for ${broadcasterId}`);
 
         if (this._onlineStreams[broadcasterId] !== undefined) {
@@ -148,6 +188,7 @@ export class StreamManager {
 
         if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
             stream.messageId = await this.sendStreamEmbed(streamInfo);
+            this.grantStreamerRole(broadcasterLogin).then();
         }
 
         this._onlineStreams[broadcasterId] = stream;
@@ -156,8 +197,9 @@ export class StreamManager {
     /**
      * Handles a stream.offline notification, removing the alert if it is present.
      * @param broadcasterId the id of the broadcaster that stopped streaming
+     * @param broadcasterLogin the login of the broadcaster that stopped streaming
      */
-    async onStreamOffline(broadcasterId: string): Promise<void> {
+    async onStreamOffline(broadcasterId: string, broadcasterLogin: string): Promise<void> {
         logger.debug(`Stream offline for ${broadcasterId}`);
 
         if (this._onlineStreams[broadcasterId] !== undefined) {
@@ -165,6 +207,7 @@ export class StreamManager {
             if (msgID !== undefined) {
                 await this.deleteMessage(broadcasterId, msgID);
             }
+            this.removeStreamerRole(broadcasterLogin).then();
             delete this._onlineStreams[broadcasterId];
         }
     }
@@ -173,9 +216,10 @@ export class StreamManager {
      * Handles a channel.update notification, removing the alert if the category is no longer the one
      * specified in the config or sending an alert if it has just changed to it.
      * @param broadcasterId the id of the broadcaster that updated his channel
+     * @param broadcasterLogin the login of the broadcaster that update his channel
      * @param category the new category for the channel
      */
-    async onChannelUpdate(broadcasterId: string, category: string): Promise<void> {
+    async onChannelUpdate(broadcasterId: string, broadcasterLogin: string, category: string): Promise<void> {
         logger.debug(`Channel update for ${broadcasterId}`);
 
         if (this._onlineStreams[broadcasterId] !== undefined) {
@@ -183,11 +227,13 @@ export class StreamManager {
             if (msgID !== undefined) {
                 if (category.toLowerCase() !== cfg['stream_category'].toLowerCase()) {
                     await this.deleteMessage(broadcasterId, msgID);
+                    this.removeStreamerRole(broadcasterLogin).then();
                 }
             } else if (category.toLowerCase() === cfg['stream_category'].toLowerCase()) {
                 const streamInfo = await this._twitchApi.getStreamInfo(broadcasterId);
                 if (!streamInfo) return;
                 this._onlineStreams[broadcasterId].messageId = await this.sendStreamEmbed(streamInfo);
+                this.grantStreamerRole(broadcasterLogin).then();
             }
         }
     }

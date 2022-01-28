@@ -8,7 +8,8 @@ const logger = getLogger('Webhooks');
 /** Represents a Twitch EventSub notification */
 interface Notification {
     'payload': object,
-    'broadcasterId': string
+    'broadcasterId': string,
+    'broadcasterLogin': string
 }
 
 /** Manages the web app that receives and handles Twitch EventSub updates through webhooks */
@@ -148,7 +149,8 @@ export class Webhooks {
         if (!Webhooks.isNotification(req, res)) return;
         const payload = JSON.parse(req.body);
         const broadcasterId = payload['event']['broadcaster_user_id'];
-        handler({ 'payload': payload, 'broadcasterId': broadcasterId });
+        const broadcasterLogin = payload['event']['broadcaster_user_login'];
+        handler({ 'payload': payload, 'broadcasterId': broadcasterId, 'broadcasterLogin': broadcasterLogin });
     }
 
     /**
@@ -158,7 +160,7 @@ export class Webhooks {
      */
     private streamOnlineHandler(notification: Notification): void {
         const broadcasterName = notification.payload['event']['broadcaster_user_name'];
-        this._streamManager.onStreamOnline(notification.broadcasterId, broadcasterName)
+        this._streamManager.onStreamOnline(notification.broadcasterId, notification.broadcasterLogin, broadcasterName)
             .then(() => logger.debug('Finished handling of stream.online notification'));
     }
 
@@ -168,7 +170,7 @@ export class Webhooks {
      * @private
      */
     private streamOfflineHandler(notification: Notification): void {
-        this._streamManager.onStreamOffline(notification.broadcasterId)
+        this._streamManager.onStreamOffline(notification.broadcasterId, notification.broadcasterLogin)
             .then(() => logger.debug('Finished handling of stream.offline notification'));
     }
 
@@ -179,7 +181,7 @@ export class Webhooks {
      */
     private channelUpdateHandler(notification: Notification): void {
         const category = notification.payload['event']['category_name'];
-        this._streamManager.onChannelUpdate(notification.broadcasterId, category)
+        this._streamManager.onChannelUpdate(notification.broadcasterId, notification.broadcasterLogin, category)
             .then(() => logger.debug('Finished handling of channel.update notification'));
     }
 }

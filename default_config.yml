@@ -19,7 +19,7 @@ webhooks_secret: SECRET_FOR_WEBHOOKS_HERE
 stream_category: TWITCH_STREAM_CATEGORY_HERE
 
 # Discord channel ID for the channel were notifications for streams will be sent
-notification_channel: 0
+notification_channel: "ID"
 
 # SQLite3 database file, must be created before starting the bot
 database_file: data.sqlite
@@ -32,13 +32,13 @@ embed:
 
 # List of twitch channels that will be tracked by the bot
 streams:
-    # Login of the streamer
-  - broadcaster_username: username1
+  # Login of the streamer
+  username1:
     # Discord user ID of the streamer in your server
-    discord_user_id: 0
+    discord_user_id: "ID"
     # Discord role ID that will be given to the streamer when he is streaming
-    role_id: 0
+    role_id: "ID"
 
-  - broadcaster_username: username2
-    discord_user_id: 0
-    role_id: 0
+  username2:
+    discord_user_id: "ID"
+    role_id: "ID"

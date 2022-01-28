@@ -1,4 +1,4 @@
-import { createLogger, format, transports } from 'winston';
+import logger from './log.js';
 import { load } from './config.js';
 import { StreamManager } from './stream_manager.js';
 import { TwitchApi } from './twitch/twitch_api.js';
@@ -6,20 +6,6 @@ import { Webhooks } from './twitch/webhooks.js';
 import { Client, Intents } from 'discord.js';
 import { getPathRelativeToProjectRoot } from './helper.js';
 import { existsSync } from 'fs';
-
-const logger = createLogger({
-    level: process.env.DEBUG ? 'debug' : 'info',
-    format: format.printf(options => {
-        if (options.moduleName) {
-            return `[${options.moduleName}] ${options.level}: ${options.message}$`;
-        } else {
-            return `[Main] ${options.level}: ${options.message}$`;
-        }
-    }),
-    transports: [
-        new transports.Console(),
-    ],
-});
 
 export function getLogger(moduleName = undefined) {
     if (moduleName) {
@@ -33,7 +19,6 @@ export const cfg = load();
 if (cfg === null) process.exit();
 
 export const dataFilePath = getPathRelativeToProjectRoot(cfg['database_file']);
-
 if (!existsSync(dataFilePath)) {
     logger.error('Database file not found, check your configuration');
     process.exit(1);
@@ -42,7 +27,8 @@ if (!existsSync(dataFilePath)) {
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 
 client.once('ready', async () => {
-    logger.info(`StreamAlert loaded in ${client.guilds.cache.size} guilds`);
+    logger.info(`StreamAlert loaded in ${client.guilds.cache.size} guild`);
+    if (client.guilds.cache.size > 1) logger.warn('This bot is meant to be used on a single server only');
 
     const twitchApi = new TwitchApi(cfg['twitch_id_client'], cfg['twitch_secret'],
         cfg['webhooks_host'], cfg['webhooks_secret']);
