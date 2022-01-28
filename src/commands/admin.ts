@@ -15,8 +15,6 @@ export const listStreamers: Command = {
         const subs = await bot.twitchApi?.getAllSubscriptions(true, true);
         if (!subs) return;
 
-        logger.debug(subs);
-
         const embed = new MessageEmbed().setColor('GREEN');
         let description = '';
         for (const id in subs) {
@@ -67,21 +65,11 @@ export const removeStreamer: Command = {
     data: new SlashCommandBuilder()
         .setName('removestreamer')
         .setDescription('Removes a registered streamer')
-        .addUserOption(option => option.setName('user').setDescription('The Discord user to remove').setRequired(true)) as SlashCommandBuilder,
+        .addStringOption(option => option.setName('twitch_login').setDescription('The streamer to remove').setRequired(true)) as SlashCommandBuilder,
     execute: async (bot, interaction) => {
         if (!bot) return;
 
-        const user = interaction.options.getUser('user');
-        if (!user) return;
-        let login: string | undefined = undefined;
-
-        const streams = bot.cfg.getSection('streams');
-        for (const key of streams) {
-            if (!key) continue;
-            if (streams.getStringIn(['streams', key, 'discord_user_id']) === user.id) {
-                login = key;
-            }
-        }
+        const login = interaction.options.getString('twitch_login');
         if (!login) return;
 
         bot.twitchApi?.deleteSubscriptions(login).then(() => {
