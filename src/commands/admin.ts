@@ -6,11 +6,11 @@ import log from '../log.js';
 
 const logger = log('AdminCommands');
 
-export const listStreamers = new Command(
-    new SlashCommandBuilder()
+export const listStreamers: Command = {
+    data: new SlashCommandBuilder()
         .setName('liststreamers')
         .setDescription('Prints a list of all registered streamers'),
-    async (interaction) => {
+    execute: async (interaction) => {
         if (!bot) return;
 
         const subs = await bot.twitchApi?.getAllSubscriptions(true, true);
@@ -31,17 +31,17 @@ export const listStreamers = new Command(
             embed.addField('', `- ${name}: ${valid ? 'valid' : 'invalid'}`);
         }
         interaction.reply({ embeds: [embed] }).then();
-    }
-);
+    },
+};
 
-export const addStreamer = new Command(
-    new SlashCommandBuilder()
+export const addStreamer: Command = {
+    data: new SlashCommandBuilder()
         .setName('addstreamer')
         .setDescription('Adds a new streamer')
         .addUserOption(option => option.setName('user').setDescription('The Discord user'))
         .addStringOption(option => option.setName('twitchLogin').setDescription('The login of the streamer on twitch'))
         .addRoleOption(option => option.setName('role').setDescription('The role to grant to the streamer while he is streaming')) as SlashCommandBuilder,
-    async (interaction) => {
+    execute: async (interaction) => {
         if (!bot) return;
 
         const user = interaction.options.getUser('user') as User;
@@ -54,15 +54,15 @@ export const addStreamer = new Command(
             });
             interaction.reply({ content: 'Done!', ephemeral: true });
         }).catch(logger.error);
-    }
-);
+    },
+};
 
-export const removeStreamer = new Command(
-    new SlashCommandBuilder()
+export const removeStreamer: Command = {
+    data: new SlashCommandBuilder()
         .setName('removestreamer')
         .setDescription('Removes a registered streamer')
         .addUserOption(option => option.setName('user').setDescription('The Discord user to remove')) as SlashCommandBuilder,
-    async (interaction) => {
+    execute: async (interaction) => {
         if (!bot) return;
 
         const user = interaction.options.getUser('user');
@@ -83,5 +83,5 @@ export const removeStreamer = new Command(
             bot?.cfg.remove(['streams', login]);
             interaction.reply({ content: 'Done!', ephemeral: true });
         }).catch(logger.error);
-    }
-);
+    },
+};

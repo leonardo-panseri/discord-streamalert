@@ -8,14 +8,9 @@ import { addStreamer, listStreamers, removeStreamer } from './admin.js';
 
 const logger = log('CommandManager');
 
-export class Command {
+export interface Command {
     readonly data: SlashCommandBuilder;
     readonly execute: (interaction: CommandInteraction) => Promise<void>;
-
-    constructor(builder: SlashCommandBuilder, handler: (interaction: CommandInteraction) => Promise<void>) {
-        this.data = builder;
-        this.execute = handler;
-    }
 }
 
 export class CommandManager {
