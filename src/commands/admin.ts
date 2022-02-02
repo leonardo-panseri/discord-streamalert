@@ -15,8 +15,8 @@ export const listStreamers: Command = {
         const subs = await bot.twitchApi?.getAllSubscriptions(true, true);
         if (!subs) return;
 
-        const embed = new MessageEmbed().setColor('GREEN');
-        let description = '';
+        const descriptions: string[] = [];
+        let currentPage = 0;
         for (const id in subs) {
             const name = subs[id].name;
             if (!name) return;
@@ -28,10 +28,21 @@ export const listStreamers: Command = {
                     if (status !== 'enabled') valid = false;
                 }
             }
-            description += `- ${name}: ${valid ? 'valid' : 'invalid'}\n`;
+            const newLine = `- https://www.twitch.tv/${name}: ${valid ? 'valid' : 'invalid'}\n`;
+            if (descriptions[currentPage].length + newLine.length > 4096) {
+                currentPage++;
+                descriptions[currentPage] = '';
+            }
+            descriptions[currentPage] += newLine;
         }
-        embed.setDescription(description);
-        interaction.reply({ embeds: [embed] }).then();
+
+        const embeds: MessageEmbed[] = [];
+        for (const description of descriptions) {
+            const embed = new MessageEmbed().setColor('GREEN');
+            embed.setDescription(description);
+            embeds.push(embed);
+        }
+        interaction.reply({ embeds: embeds }).then();
     },
 };
 
