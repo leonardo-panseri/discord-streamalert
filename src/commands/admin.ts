@@ -22,7 +22,7 @@ export const listStreamers: Command = {
         descriptions[currentPage] = '';
         let count = 0;
         for (const id in subs) {
-            const name = subs[id].name;
+            const name = subs[id].name as string;
             if (!name) return;
             let valid = true;
             for (const type of ['stream.online', 'stream.offline', 'channel.update']) {
@@ -32,7 +32,10 @@ export const listStreamers: Command = {
                     if (status !== 'enabled') valid = false;
                 }
             }
-            const newLine = `- https://www.twitch.tv/${name}: ${valid ? 'valid' : 'invalid'}\n`;
+
+            const discordUser = await interaction.guild?.members.fetch(bot.cfg.getStringIn(['streams', name, 'discord_user_id']));
+
+            const newLine = `- ${discordUser} / https://www.twitch.tv/${name}: ${valid ? 'valid' : 'invalid'}\n`;
             if (descriptions[currentPage].length + newLine.length > 4096) {
                 currentPage++;
                 descriptions[currentPage] = '';
