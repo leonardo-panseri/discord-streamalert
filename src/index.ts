@@ -78,7 +78,7 @@ export class Bot {
         }
         const guildsNum = bot._client.guilds.cache.size;
         logger.info(`StreamAlert loaded in ${guildsNum} guild`);
-        if (guildsNum) logger.warn('This bot is meant to be used on a single server only');
+        if (guildsNum > 1) logger.warn('This bot is meant to be used on a single server only');
 
         bot.twitchApi = new TwitchApi(
             bot.cfg.getString('twitch_id_client'), bot.cfg.getString('twitch_secret'),
