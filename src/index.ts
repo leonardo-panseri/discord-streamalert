@@ -48,6 +48,27 @@ export class Bot {
         });
 
         this._client.once('ready', this.onReady);
+
+        this._client.on('guildMemberRemove', member => {
+            let login: string | undefined = undefined;
+            const sect = bot?.cfg.getSection('streams');
+            for (const user in sect) {
+                if (sect.getStringIn([user, 'discord_user_id']) === member.id) {
+                    login = user;
+                    break;
+                }
+            }
+
+            if (login) {
+                bot?.twitchApi?.deleteSubscriptions(login).then(() => {
+                    if (!login) return;
+                    bot?.cfg.remove(['streams', login]);
+                    logger.info(`Removed user ${login} from streamers because he left the guild`);
+                }).catch((e) => {
+                    logger.error(e);
+                });
+            }
+        });
     }
 
     private async onReady() {

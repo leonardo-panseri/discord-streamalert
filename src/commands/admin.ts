@@ -12,11 +12,14 @@ export const listStreamers: Command = {
     execute: async (bot, interaction) => {
         if (!bot) return;
 
+        await interaction.deferReply();
+
         const subs = await bot.twitchApi?.getAllSubscriptions(true, true);
         if (!subs) return;
 
         const descriptions: string[] = [];
         let currentPage = 0;
+        let count = 0;
         for (const id in subs) {
             const name = subs[id].name;
             if (!name) return;
@@ -34,15 +37,16 @@ export const listStreamers: Command = {
                 descriptions[currentPage] = '';
             }
             descriptions[currentPage] += newLine;
+            count++;
         }
 
         const embeds: MessageEmbed[] = [];
         for (const description of descriptions) {
-            const embed = new MessageEmbed().setColor('GREEN');
+            const embed = new MessageEmbed().setColor('GREEN').setFooter({ text: `Total: ${count}` });
             embed.setDescription(description);
             embeds.push(embed);
         }
-        interaction.reply({ embeds: embeds }).then();
+        interaction.editReply({ embeds: embeds }).then();
     },
 };
 
