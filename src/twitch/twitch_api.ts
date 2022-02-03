@@ -157,9 +157,10 @@ export class TwitchApi {
     /**
      * Gets the name of the user, or undefined if not found
      * @param userId the user id
+     * @param login if the login should be returned instead of the display name
      * @private
      */
-    private async getUsername(userId: string): Promise<string | undefined> {
+    private async getUsername(userId: string, login = false): Promise<string | undefined> {
         const url = TwitchApi.getUrlWithParams(TwitchApi.urls.USERS, { 'id': userId });
         const res = await this.makeApiCall(url, {
             headers: await this.getHeaders(),
@@ -171,6 +172,7 @@ export class TwitchApi {
             logger.warn(`No user with username ${userId}`);
             return undefined;
         }
+        if (login) return data[0]['login'] as string;
         return data[0]['display_name'] as string;
     }
 
@@ -315,9 +317,9 @@ export class TwitchApi {
     /**
      * Gets all subscriptions made to the EventSub endpoint
      * @param updateCache if the result should be used to update cache (default: false)
-     * @param fetchDisplayNames if the result should contain display names
+     * @param fetchLoginNames if the result should contain login names
      */
-    async getAllSubscriptions(updateCache = false, fetchDisplayNames = false): Promise<Subscriptions | undefined> {
+    async getAllSubscriptions(updateCache = false, fetchLoginNames = false): Promise<Subscriptions | undefined> {
         const result: Subscriptions = {};
         let paginationCursor: string | undefined = undefined;
         do {
@@ -343,9 +345,9 @@ export class TwitchApi {
 
                 if (result[broadcasterId] === undefined) result[broadcasterId] = {};
 
-                if (fetchDisplayNames) {
+                if (fetchLoginNames) {
                     if (result[broadcasterId].name === undefined) {
-                        result[broadcasterId].name = await this.getUsername(broadcasterId) as string;
+                        result[broadcasterId].name = await this.getUsername(broadcasterId, true) as string;
                     }
                 }
 
