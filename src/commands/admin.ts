@@ -19,6 +19,7 @@ export const listStreamers: Command = {
 
         const descriptions: string[] = [];
         let currentPage = 0;
+        descriptions[currentPage] = '';
         let count = 0;
         for (const id in subs) {
             const name = subs[id].name;
