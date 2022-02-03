@@ -93,7 +93,7 @@ export class Bot {
             for (const login of bot.cfg.getSection('streams')) {
                 if (login) {
                     bot.twitchApi?.subscribeToStreamUpdates(login)
-                        .then(() => logger.info('Finished subscribing process'));
+                        .then(() => logger.debug(`Finished subscribing process for ${login}`));
                 }
             }
         });
