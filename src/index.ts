@@ -33,7 +33,7 @@ export class Bot {
             process.exit(1);
         }
 
-        this._client = new Client({ intents: [Intents.FLAGS.GUILDS] });
+        this._client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS] });
         this._cmdManager = new CommandManager();
 
         this.registerEventListeners();
