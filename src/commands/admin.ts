@@ -33,9 +33,15 @@ export const listStreamers: Command = {
                 }
             }
 
-            const discordUser = await interaction.guild?.members.fetch(bot.cfg.getStringIn(['streams', name, 'discord_user_id']));
+            let discordUser = undefined;
+            try {
+                const discordUserId = bot.cfg.getStringIn(['streams', name, 'discord_user_id']);
+                discordUser = await interaction.guild?.members.fetch(discordUserId);
+            } catch (e) {
+                logger.warn(`Twitch user ${name} has invalid discord_user_id`);
+            }
 
-            const newLine = `- ${discordUser} / https://www.twitch.tv/${name}: ${valid ? 'valid' : 'invalid'}\n`;
+            const newLine = `- ${discordUser ? discordUser : 'not_valid'} / https://www.twitch.tv/${name}: ${valid && discordUser ? 'valid' : 'invalid'}\n`;
             if (descriptions[currentPage].length + newLine.length > 4096) {
                 currentPage++;
                 descriptions[currentPage] = '';
