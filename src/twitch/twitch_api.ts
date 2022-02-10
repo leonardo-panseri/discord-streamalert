@@ -306,7 +306,7 @@ export class TwitchApi {
         if (!broadcasterID) return;
         const cachedSubscriptions = await this._cache.get(broadcasterID);
         if (cachedSubscriptions !== undefined) {
-            for (const type of ['stream.online', 'stream.offline', 'channel.update']) {
+            for (const type of ['stream.online', 'stream.offline', 'channel.update', 'channel.raid']) {
                 if (cachedSubscriptions[type] !== undefined) {
                     const subID = cachedSubscriptions[type]['id'];
                     await this.deleteSubscription(subID);
@@ -340,8 +340,10 @@ export class TwitchApi {
 
             const data = res['data'] as JsonPayload[];
             for (const sub of data) {
-                const broadcasterId = (sub['condition'] as JsonPayload)['broadcaster_user_id'] as string;
                 const type = sub['type'] as string;
+                let broadcasterId;
+                if (type === 'channel.raid') broadcasterId = (sub['condition'] as JsonPayload)['from_broadcaster_user_id'] as string;
+                else broadcasterId = (sub['condition'] as JsonPayload)['broadcaster_user_id'] as string;
                 const id = sub['id'] as string;
                 const status = sub['status'] as string;
 

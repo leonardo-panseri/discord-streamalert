@@ -25,7 +25,7 @@ export const listStreamers: Command = {
             const name = subs[id].name as string;
             if (!name) return;
             let valid = true;
-            for (const type of ['stream.online', 'stream.offline', 'channel.update']) {
+            for (const type of ['stream.online', 'stream.offline', 'channel.update', 'channel.raid']) {
                 const sect = subs[id][type];
                 if (typeof sect !== 'string') {
                     const status = sect.status;
