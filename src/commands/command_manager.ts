@@ -29,8 +29,13 @@ export class CommandManager {
 
         command.execute(bot, interaction).catch(e => {
             logger.error(`Interaction '${interaction.commandName}': ${e}`);
-            interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true })
-                .then();
+            if (interaction.deferred) {
+                interaction.editReply({ content: 'There was an error while executing this command!' })
+                    .then();
+            } else {
+                interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true })
+                    .then();
+            }
         });
     }
 
