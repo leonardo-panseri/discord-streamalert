@@ -1,5 +1,5 @@
 import log from './log.js';
-import { Document, parse, parseDocument } from 'yaml';
+import { Document, parseDocument, parse, YAMLMap } from 'yaml';
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'fs';
 import { getPathRelativeToProjectRoot } from './helper.js';
 
@@ -13,12 +13,14 @@ export class Config {
     private static readonly DEFAULT_CONFIG_FILE = getPathRelativeToProjectRoot('default_config.yml');
     private static readonly CONFIG_FILE = getPathRelativeToProjectRoot('config.yml');
 
-    private readonly _root: ConfigSect;
+    private readonly _root: string[];
     private readonly _doc: Document;
 
-    constructor(base?: Config, sect?: ConfigSect) {
-        if (base && sect) {
-            this._root = sect;
+    constructor(base?: Config, sectionKey?: string) {
+        if (base && sectionKey) {
+            this._root = [];
+            this._root.push(...base._root);
+            this._root.push(sectionKey);
             this._doc = base._doc;
         } else {
             if (!existsSync(Config.CONFIG_FILE)) {
@@ -28,13 +30,25 @@ export class Config {
             }
 
             const configFile = readFileSync(Config.CONFIG_FILE, 'utf8');
-            this._root = parse(configFile);
+            this._root = [];
             this._doc = parseDocument(configFile);
         }
     }
 
+    private getPath(key: string | string[]): string[] {
+        const res: string[] = [];
+        res.push(...this._root);
+        if (typeof key === 'string') res.push(key);
+        else res.push(...key);
+        return res;
+    }
+
+    private getNode(key: string | string[]): unknown {
+        return this._doc.getIn(this.getPath(key));
+    }
+
     getString(key: string): string {
-        const value = this._root[key];
+        const value = this.getNode(key);
         if (typeof value === 'string') {
             return value;
         } else {
@@ -43,7 +57,7 @@ export class Config {
     }
 
     getStringIn(path: string[]): string {
-        const value = this._doc.getIn(path);
+        const value = this.getNode(path);
         if (typeof value === 'string') {
             return value;
         } else {
@@ -52,7 +66,7 @@ export class Config {
     }
 
     getNumber(key: string): number {
-        const value = this._root[key];
+        const value = this.getNode(key);
         if (typeof value === 'number') {
             return value;
         } else {
@@ -61,7 +75,7 @@ export class Config {
     }
 
     getBoolean(key: string): boolean {
-        const value = this._root[key];
+        const value = this.getNode(key);
         if (typeof value === 'boolean') {
             return value;
         } else {
@@ -70,16 +84,12 @@ export class Config {
     }
 
     getSection(key: string): Config {
-        const value = this._root[key];
-        if (Config.isSection(value)) {
-            return new Config(this, value);
+        const value = this.getNode(key);
+        if (value instanceof YAMLMap) {
+            return new Config(this, key);
         } else {
             throw TypeError(`Config value with key '${key}' is of type '${typeof value}'`);
         }
-    }
-
-    private static isSection(obj: string | number | boolean | ConfigSect): obj is ConfigSect {
-        return !!(obj && typeof obj !== 'string' && typeof obj !== 'number' && typeof obj !== 'boolean');
     }
 
     /**
@@ -88,17 +98,23 @@ export class Config {
      * @param value the value to be added
      */
     add(path: string[], value: unknown) {
-        this._doc.addIn(path, value);
+        this._doc.addIn(this.getPath(path), value);
         writeFileSync(Config.CONFIG_FILE, this._doc.toString(), 'utf8');
     }
 
     remove(path: string[]) {
-        this._doc.deleteIn(path);
+        this._doc.deleteIn(this.getPath(path));
         writeFileSync(Config.CONFIG_FILE, this._doc.toString(), 'utf8');
     }
 
     [Symbol.iterator]() {
-        const keys = Object.keys(this._root);
+        // We need to parse this from file each time to ensure that every change made from any
+        // instance of Config (root and sections) is correctly reflected
+        let obj = parse(readFileSync(Config.CONFIG_FILE, 'utf8'));
+        for (const key of this._root) {
+            obj = obj[key];
+        }
+        const keys = Object.keys(obj);
         let i = 0;
         return {
             next() {
