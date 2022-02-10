@@ -61,6 +61,10 @@ export class Webhooks {
             this.handleRequest(req, res, Webhooks.channelUpdateHandler);
         });
 
+        this._app.post('/raid', (req, res) => {
+            this.handleRequest(req, res, Webhooks.channelRaidHandler);
+        });
+
         this._app.listen(this._port, this._onReady);
     }
 
@@ -192,5 +196,18 @@ export class Webhooks {
         const category = (notification.payload['event'] as JsonPayload)['category_name'] as string;
         streamManager.onChannelUpdate(notification.broadcasterId, notification.broadcasterLogin, category)
             .then(() => logger.debug('Finished handling of channel.update notification'));
+    }
+
+    /**
+     * Handles the channel.raid notification.
+     * @param streamManager the instance of the manager that will handle this notification
+     * @param notification the notification that has been received
+     * @private
+     */
+    private static channelRaidHandler(streamManager: StreamManager, notification: Notification): void {
+        const broadcasterId = (notification.payload['event'] as JsonPayload)['from_broadcaster_user_id'] as string;
+        const broadcasterLogin = (notification.payload['event'] as JsonPayload)['from_broadcaster_user_login'] as string;
+        streamManager.onStreamOffline(broadcasterId, broadcasterLogin)
+            .then(() => logger.debug('Finished handling of channel.raid notification'));
     }
 }

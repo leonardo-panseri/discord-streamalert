@@ -21,7 +21,8 @@ class EventSubPayload {
 
     constructor(type: string, broadcasterID: string, callbackUrl: string, callbackSecret: string) {
         this.type = type;
-        this.condition['broadcaster_user_id'] = broadcasterID;
+        if (type === 'channel.raid') this.condition['from_broadcaster_user_id'] = broadcasterID;
+        else this.condition['broadcaster_user_id'] = broadcasterID;
         this.transport['callback'] = callbackUrl;
         this.transport['secret'] = callbackSecret;
     }
@@ -292,6 +293,7 @@ export class TwitchApi {
             await this.subscribeToEvent('stream.online', broadcasterID, '/online');
             await this.subscribeToEvent('stream.offline', broadcasterID, '/offline');
             await this.subscribeToEvent('channel.update', broadcasterID, '/update');
+            await this.subscribeToEvent('channel.raid', broadcasterID, '/raid');
         }
     }
 
