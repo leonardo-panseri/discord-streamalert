@@ -52,7 +52,9 @@ export class Bot {
         this._client.on('guildMemberRemove', member => {
             let login: string | undefined = undefined;
             const sect = bot?.cfg.getSection('streams');
-            for (const user in sect) {
+            if (!sect) return;
+            for (const user of sect) {
+                if (!user) continue;
                 if (sect.getStringIn([user, 'discord_user_id']) === member.id) {
                     login = user;
                     break;
@@ -78,7 +80,7 @@ export class Bot {
         }
         const guildsNum = bot._client.guilds.cache.size;
         logger.info(`StreamAlert loaded in ${guildsNum} guild`);
-        if (guildsNum > 1) logger.warn('This bot is meant to be used on a single server only');
+        if (guildsNum > 1) logger.warn('This bot is meant to be used on a single guild only');
 
         bot.twitchApi = new TwitchApi(
             bot.cfg.getString('twitch_id_client'), bot.cfg.getString('twitch_secret'),
