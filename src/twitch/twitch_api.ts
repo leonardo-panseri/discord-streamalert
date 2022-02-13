@@ -223,6 +223,23 @@ export class TwitchApi {
     }
 
     /**
+     * Deletes all subscriptions made by this Twitch Client.
+     * @private
+     */
+    async deleteAllSubscriptions(): Promise<void> {
+        const subs = await this.getAllSubscriptions();
+        for (const broadcasterId in subs) {
+            for (const type in subs[broadcasterId]) {
+                const el = subs[broadcasterId][type];
+                if (typeof el !== 'string') {
+                    const subId = el.id;
+                    await this.deleteSubscription(subId);
+                }
+            }
+        }
+    }
+
+    /**
      * Subscribes to the event of the given type for the given broadcaster.
      * @param type a Twitch EventSub event type
      * @param broadcasterID the id of the broadcaster

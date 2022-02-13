@@ -33,8 +33,13 @@ export class Bot {
             process.exit(1);
         }
 
-        this._client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS] });
+        this._client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS, Intents.FLAGS.GUILD_MESSAGES] });
         this._cmdManager = new CommandManager();
+
+        this.twitchApi = new TwitchApi(
+            this.cfg.getString('twitch_id_client'), this.cfg.getString('twitch_secret'),
+            this.cfg.getString('webhooks_host'), this.cfg.getString('webhooks_secret'),
+            this._dataFilePath);
 
         this.registerEventListeners();
     }
@@ -74,18 +79,13 @@ export class Bot {
     }
 
     private async onReady() {
-        if (!bot) {
+        if (!bot || !bot.twitchApi) {
             logger.error('Bot is null');
             return;
         }
         const guildsNum = bot._client.guilds.cache.size;
         logger.info(`StreamAlert loaded in ${guildsNum} guild`);
         if (guildsNum > 1) logger.warn('This bot is meant to be used on a single guild only');
-
-        bot.twitchApi = new TwitchApi(
-            bot.cfg.getString('twitch_id_client'), bot.cfg.getString('twitch_secret'),
-            bot.cfg.getString('webhooks_host'), bot.cfg.getString('webhooks_secret'),
-            bot._dataFilePath);
 
         bot.streamManager = new StreamManager(bot._client, bot.twitchApi, bot._dataFilePath, bot.cfg);
 
@@ -103,8 +103,12 @@ export class Bot {
     }
 
     start() {
-        this._client.login(this.cfg.getString('token'))
-            .then(() => logger.debug('Bot has logged in'));
+        if (process.env.DELETE_ALL_SUBS) {
+            this.twitchApi?.deleteAllSubscriptions();
+        } else {
+            this._client.login(this.cfg.getString('token'))
+                .then(() => logger.debug('Bot has logged in'));
+        }
     }
 }
 
