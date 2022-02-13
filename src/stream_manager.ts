@@ -143,7 +143,7 @@ export class StreamManager {
     private async grantStreamerRole(broadcasterLogin: string) {
         const member = await this.fetchDiscordUser(broadcasterLogin);
         if (!member) return;
-        member.roles.add(this._cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
+        member.roles.add(this._cfg.getString('streamer_online_role'))
             .catch(logger.error);
     }
 
@@ -155,7 +155,7 @@ export class StreamManager {
     private async removeStreamerRole(broadcasterLogin: string) {
         const member = await this.fetchDiscordUser(broadcasterLogin);
         if (!member) return;
-        member.roles.remove(this._cfg.getStringIn(['streams', broadcasterLogin, 'role_id']))
+        member.roles.remove(this._cfg.getString('streamer_online_role'))
             .catch(logger.error);
     }
 

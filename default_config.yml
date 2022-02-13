@@ -22,9 +22,12 @@ webhooks_secret: SECRET_FOR_WEBHOOKS_HERE
 
 # Twitch stream category that the bot will process notifications for
 stream_category: TWITCH_STREAM_CATEGORY_HERE
-
 # Discord channel ID for the channel were notifications for streams will be sent
 notification_channel: "ID"
+# Discord role ID for the role to give to all streamers managed by the bot
+streamer_role: "ID"
+# Discord role ID for the role to give to streamers that are live
+streamer_online_role: "ID"
 
 # SQLite3 database file, must be created before starting the bot
 database_file: data.sqlite

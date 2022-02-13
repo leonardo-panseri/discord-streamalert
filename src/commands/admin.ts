@@ -1,9 +1,14 @@
 import { Command } from './command_manager.js';
 import { SlashCommandBuilder } from '@discordjs/builders';
-import { MessageEmbed, Role, User } from 'discord.js';
+import { CommandInteraction, MessageEmbed, User } from 'discord.js';
 import log from '../log.js';
 
 const logger = log('AdminCommands');
+
+const errorHandler = (interaction: CommandInteraction, e: Error) => {
+    logger.error(e);
+    interaction.reply({ content: 'An error has occurred', ephemeral: true }).then();
+};
 
 export const listStreamers: Command = {
     data: new SlashCommandBuilder()
@@ -65,24 +70,24 @@ export const addStreamer: Command = {
         .setName('addstreamer')
         .setDescription('Adds a new streamer')
         .addUserOption(option => option.setName('user').setDescription('The Discord user').setRequired(true))
-        .addStringOption(option => option.setName('twitch_login').setDescription('The login of the streamer on twitch').setRequired(true))
-        .addRoleOption(option => option.setName('role').setDescription('The role to grant to the streamer while he is streaming').setRequired(true)) as SlashCommandBuilder,
+        .addStringOption(option => option.setName('twitch_login').setDescription('The login of the streamer on twitch').setRequired(true)) as SlashCommandBuilder,
     execute: async (bot, interaction) => {
         if (!bot) return;
 
         const user = interaction.options.getUser('user') as User;
         const login = interaction.options.getString('twitch_login') as string;
-        const role = interaction.options.getRole('role') as Role;
         bot.twitchApi?.subscribeToStreamUpdates(login).then(() => {
             bot?.cfg.add(['streams', login], {
                 discord_user_id: user.id,
-                role_id: role.id,
             });
+
+            interaction.guild?.members.fetch(user)
+                .then(member => member.roles.add(bot.cfg.getString('streamer_role'))
+                    .catch(e => errorHandler(interaction, e)))
+                .catch(e => errorHandler(interaction, e));
+
             interaction.reply({ content: 'Done!', ephemeral: true });
-        }).catch((e) => {
-            logger.error(e);
-            interaction.reply({ content: 'An error has occurred', ephemeral: true });
-        });
+        }).catch((e) => errorHandler(interaction, e));
     },
 };
 
@@ -99,11 +104,15 @@ export const removeStreamer: Command = {
 
         bot.twitchApi?.deleteSubscriptions(login).then(() => {
             if (!login) return;
-            bot?.cfg.remove(['streams', login]);
+            const memberId = bot?.cfg.getStringIn(['streams', login, 'discord_user_id']);
+            bot.cfg.remove(['streams', login]);
+
+            interaction.guild?.members.fetch(memberId)
+                .then(member => member.roles.remove(bot.cfg.getString('streamer_role'))
+                    .catch(e => errorHandler(interaction, e)))
+                .catch(e => errorHandler(interaction, e));
+
             interaction.reply({ content: 'Done!', ephemeral: true });
-        }).catch((e) => {
-            logger.error(e);
-            interaction.reply({ content: 'An error has occurred', ephemeral: true });
-        });
+        }).catch((e) => errorHandler(interaction, e));
     },
 };
